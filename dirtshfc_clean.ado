@@ -115,8 +115,8 @@
 		}
 		
 		/**********************************************************************
-		Rename relevant variables, drop unwanted vars and merge in the 
-		enum_details dataset
+		Rename relevant variables, change var typesdrop unwanted vars and merge 
+		in the enum_details dataset
 		
 		**ADD SOME MORE VARS TO REN AND DROP AFTER LOOKING AT THE ACTUAL DATA**
 		***********************************************************************/
@@ -125,14 +125,15 @@
 		
 		ren (FPrimary s_suv_name) ///
 			(hhid 	  enum_id	)
+			
+		// Enusre that certain variables are numeric 
+		destring enum_id deviceid
 		
 		// Drop unwanted vars 
 		drop subscriberid simid devicephonenum username caseid
 		
 		// Merge in enum_data 
 		merge m:1 using "`enum_data'", nogen
-		
-		
 		/***********************************************************************
 		Format date and time variables and create a string date var in the format
 		dd_mm_yy
@@ -142,10 +143,23 @@
 		datestr starttime, newvar(startdate_str)
 		datestr endtime, newvar(enddate_str)
 		
+		/***********************************************************************
+		Drop Unnneeded observations in repeat groups
+		
+		** WORK ON THIS AFTER SEEING THE IMPORT DATA**
+		** THERE MAY BE A NEED TO RESHAPE AND MERGE**
+		***********************************************************************/
 		
 	
+	
+		/***********************************************************************
+		Save an HFC ready copy of the dataset
+		***********************************************************************/
+		
+		save `saving', replace
 	}
-
+	
+	
 end
 
 
