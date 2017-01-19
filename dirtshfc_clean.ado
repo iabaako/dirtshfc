@@ -148,16 +148,22 @@
 		Drop observations that are as a result of duplicate submission. In such 
 		situatitions the duration and as hhid will be the same
 		***********************************************************************/
+		cap isid hhid duration
+		if _rc == 459 {
+			noi di in red "Dropping some duplicate submissions based on hhid and duration"
+			duplicates drop hhid duration, force
+		}
+		
+		// Generate a dur_min variable
+		gen dur_min = floor(duration/60)
 		
 		
 		/***********************************************************************
-		Create a variable that will contain the duration of each survey in minutes
-		***********************************************************************/
-		
-		
-		
-		/***********************************************************************
-		Drop Unnneeded observations in repeat groups
+		Drop Unneeded observations in repeat groups. Sometimes repeat groups 
+		may contain unneeded information because the surveyor mistakenly opened
+		a repeat group and started entering some information into it before 
+		realising that they didnt need it. IN some cases if the repeat group is
+		closed without removing the information, it stays in the data. 
 		
 		** WORK ON THIS AFTER SEEING THE IMPORT DATA**
 		** THERE MAY BE A NEED TO RESHAPE AND MERGE**
