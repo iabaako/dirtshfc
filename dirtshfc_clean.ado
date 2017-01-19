@@ -172,7 +172,7 @@
 	
 	
 		/***********************************************************************
-		Save an HFC ready copy of the dataset
+		Save a copy of the data ready for correction
 		***********************************************************************/
 		
 		save `saving', replace

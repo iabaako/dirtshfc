@@ -128,11 +128,64 @@
 			Mark Flagged observations as okay. Some observatios may be flagged as 
 			outliers or suspicious but upon investigation may be deemed as okay.
 			********************************************************************/
-			use `corr_data', clear
+			
 			if `hfc_drop' > 0 {
 			
+				use `corr_data', clear
+			
 				noi di as title "{bf: Marked `hfc_okay' flagged issues as okay, Details are as follows:"
-				noi di as title "s_key" _column(30) as title "hhid" _column(90) as title
+				noi di as title "s_key" _column(15) as title "hhid" _column(25) as title "variable" _column(40) as title "value"
+				
+				keep if action == 0
+				
+				// Save s_keys, hhids, variable names and values in locals
+				forval i = 1/`hfc_okay' {
+					loc s_key_`i' = s_key[`i']
+					loc hhid_`i' = hhid[`i']
+					loc variable_`i' = variable[`i']
+					loc value_`i' = value[`i']
+				}
+
+				// Load dataset and mark as okay. For eac var, create a var that *_ok
+				use "`dataset'", clear
+				forval i = 1/`hfc_okay' {
+				
+					// Check that the entries in the correction sheets are valid
+					foreach name in "`s_key_`i''" "`hhid_`i''" "`variable_`i''" "`value'_`i'" {
+						
+						// Get the actual name of the variable
+						loc name = substr("`name'", 1, length(`name') - length(`i')) 
+						
+					
+						// Check that value is in the dataset before dropping
+						cap assert `name' != "``name'_`i''"
+						if !_rc {
+							noi di as err "dirtshfc_correct: Wrong s_key(``name'_`i'') specified in correction sheet"
+							exit 9
+						}
+					}
+				
+					// Check if the variable marker exist, else create it
+					cap confirm var `variable_`i''_ok 
+					if _rc == 111 {
+						gen `variable_`i''_ok = 0
+					}
+				
+					cap confirm string var `variable_`i'' 
+					if !_rc {
+						replace `variable_`i''_ok = 1 if s_key == "`s_key_`i''" & hhid == "`hhid'" ///
+							& `variable_`i'' == "`value_`i''"
+					}
+					
+					else {
+						replace `variable_`i''_ok = 1 if s_key == "`s_key_`i''" & hhid == "`hhid'" ///
+							& `variable_`i'' == `value_`i''
+					}
+						
+					noi di as title "`s_key_`i''" _column(15) as title "`hhid_`i''" _column(25) ///
+						as title "`variable_`i''" _column(40) as title "`value_`i''"
+				
+				}
 			
 			}
 			
@@ -143,44 +196,44 @@
 			correction sheet to be dropped
 			********************************************************************/
 			
-			use `corr_data', clear
-			if `hfc_drop' > 1 {
+			if `hfc_drop' > 0 {
+			
+				use `corr_data', clear
 				
 				noi di as title "{bf: Dropped `hfc_drop' observations from the dataset, Details are as follows:"
-				noi di as title "s_key" _column(30) as title "hhid"
+				noi di as title "s_key" _column(15) as title "hhid"
 				
 				// keep only observations in corr sheet that will be dropped
 				keep if action == 1
-				count if !mi(action)
-				loc drop_count `r(N)'
 				
 				// Save s_keys and hhids in locals
-				forval i = 1/`drop_count' {
+				forval i = 1/`hfc_drop' {
 					loc s_key_`i' = s_key[`i']
 					loc hhid_`i' = hhid[`i']
 				}
 				
 				// Load the dataset, loop through and drop the obs with matching keys and hhids
 				use "`dataset'", clear
-				forval i = 1/`drop_count' {
+				forval i = 1/`hfc_drop' {
 				
-					// Check that s_key and hhids are in the dataset before dropping
-					cap assert s_key != "`s_key_`i''"
-					if !_rc {
-						noi di as err "dirtshfc_correct: Wrong s_key(`s_key_`i') specified in correction sheet"
-						exit 9
-					}
+					// Check that the entries in the correction sheets are valid
+					foreach name in "`s_key_`i''" "`hhid_`i''" {
+						
+						// Get the actual name of the variable
+						loc name = substr("`name'", 1, length(`name') - length(`i')) 
+						
 					
-					// Check that s_key and hhids are in the dataset before dropping
-					cap assert hhid != "`hhid_`i''"
-					if !_rc {
-						noi di as err "dirtshfc_correct: Wrong hhid(`hhid_`i') specified in correction sheet"
-						exit 9
+						// Check that value is in the dataset before dropping
+						cap assert `name' != "``name'_`i''"
+						if !_rc {
+							noi di as err "dirtshfc_correct: Wrong s_key(``name'_`i'') specified in correction sheet"
+							exit 9
+						}
 					}
 
 					
 					drop if s_key == "`s_key_`i''" & hhid == "`hhid_`i''"
-					noi di as "`s_key_`i'" _column(30) "`hhid_`i'"
+					noi di as "`s_key_`i'" _column(15) "`hhid_`i'"
 				}
 				
 			}
@@ -191,8 +244,74 @@
 			Replacements
 			********************************************************************/
 		
-		
+			if `hfc_rep' > 0 {
+			
+				use `corr_data', clear
+			
+				noi di as title "{bf: Replaced `hfc_rep' flagged issues, Details are as follows:"
+				noi di as title "s_key" _column(15) as title "hhid" _column(25) ///
+					as title "variable" _column(40) as title "value" _column(55) as title "new_value" 
+				
+				keep if action == 2
+				
+				// Save s_keys, hhids, variable names and values in locals
+				forval i = 1/`hfc_rep' {
+					loc s_key_`i' = s_key[`i']
+					loc hhid_`i' = hhid[`i']
+					loc variable_`i' = variable[`i']
+					loc value_`i' = value[`i']
+					loc new_value_`i' = value[`i']
+				}
+
+				
+				// Check that the entries in the correction sheets are valid
+				foreach name in "`s_key_`i''" "`hhid_`i''" "`variable_`i''" "`value'_`i'" "`new_value_`i''" {
+						
+					// Get the actual name of the variable
+					loc name = substr("`name'", 1, length(`name') - length(`i')) 
+						
+					
+					// Check that value is in the dataset before dropping
+					cap assert `name' != "``name'_`i''"
+					if !_rc {
+						noi di as err "dirtshfc_correct: Wrong s_key(``name'_`i'') specified in correction sheet"
+						exit 9
+					}
+				}
+								
+				cap confirm string var `variable_`i'' 
+				if !_rc {
+					replace `variable_`i'' = "`new_value'" if s_key == "`s_key_`i''" & hhid == "`hhid'" ///
+						& `variable_`i'' == "`value_`i''"
+				}
+					
+				else {
+					replace `variable_`i'' = `new_value' if s_key == "`s_key_`i''" & hhid == "`hhid'" ///
+						& `variable_`i'' == `value_`i''
+				}
+						
+				noi di as title "`s_key_`i''" _column(15) as title "`hhid_`i''" _column(25) ///
+					as title "`variable_`i''" _column(40) as title "`value_`i''" _column(55) as title "`new_value_`i''"
+			
+			}
+			
+			noi di
+
 		}
+		
+		/***********************************************************************
+		Save a copy of the data ready for hfc checks
+		***********************************************************************/
+
+		
+		// Close log
+		log close
+		
+		// Save file
+		save "`saving'", replace
+		
+		// return to starting directory
+		cd "`hfcpwd'"
 	}
 	
 	
