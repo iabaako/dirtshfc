@@ -127,7 +127,7 @@
 			(hhid 	  enum_id	)
 			
 		// Enusre that certain variables are numeric 
-		destring enum_id deviceid
+		destring enum_id deviceid duration
 		
 		// Drop unwanted vars 
 		drop subscriberid simid devicephonenum username caseid
@@ -142,6 +142,19 @@
 		datestr submissiondate, newvar(subdate_str)
 		datestr starttime, newvar(startdate_str)
 		datestr endtime, newvar(enddate_str)
+		
+		
+		/***********************************************************************
+		Drop observations that are as a result of duplicate submission. In such 
+		situatitions the duration and as hhid will be the same
+		***********************************************************************/
+		
+		
+		/***********************************************************************
+		Create a variable that will contain the duration of each survey in minutes
+		***********************************************************************/
+		
+		
 		
 		/***********************************************************************
 		Drop Unnneeded observations in repeat groups
