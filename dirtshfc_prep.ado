@@ -15,7 +15,7 @@
 	and saved in the new semi cleaned dataset
 */
 
-	program define dirtshfc_clean
+	program define dirtshfc_prep
 	
 		syntax,
 		DIRECTory(string)
@@ -34,7 +34,7 @@
 		// Check that the directory specified as is encrypted with Boxcryptor
 		loc pathx = substr("`directory'", 1, 1)
 		if `pathx' != "X" {
-			noi di as err "dirtshfc_clean: Hello!! Folder specified with directory must be BOXCRYPTED"
+			noi di as err "dirtshfc_prep: Hello!! Folder specified with directory must be BOXCRYPTED"
 			exit 601
 		}
 		
@@ -67,7 +67,7 @@
 			// Throw and error if file does not exist
 			else {
 			
-				noi di as err "dirtshfc_clean: File `dataset' not found in `directory'"
+				noi di as err "dirtshfc_prep: File `dataset' not found in `directory'"
 				exit 601
 			}
 		}
@@ -82,7 +82,7 @@
 		
 		// Check that the dataset contains some data
 		if (_N==0) {
-			noi di as error "dirtshfc_clean: no observation"
+			noi di as error "dirtshfc_prep: no observation"
 			exit 2000
 		}
 		
@@ -104,13 +104,13 @@
 			}
 			
 			else {
-				noi di as err "dirtshfc_clean: variable key does not uniquely identify the observations"
+				noi di as err "dirtshfc_prep: variable key does not uniquely identify the observations"
 				exit 459
 			}
 		}
 		
 		else {
-			noi di as err "dirtshfc_clean: variable key not found"
+			noi di as err "dirtshfc_prep: variable key not found"
 			exit 111
 		}
 		
