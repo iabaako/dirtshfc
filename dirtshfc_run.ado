@@ -15,6 +15,7 @@
 		DIRECTory(string)
 		DATAset(string)
 		LOGFolder(string)
+		HFCDate(string)
 
 	qui {	
 		
@@ -64,7 +65,7 @@
 				use "`dataset'", clear
 			}
 			
-			// Throw and error if file does not exist
+			// Throw an error if file does not exist
 			else {
 			
 				noi di as err "dirtshfc_run: File `dataset' not found in `directory'"
@@ -96,15 +97,25 @@
 		***********************************************************************/
 		
 		forval i in 0 `team_ids' {
-		
+			
+			// Load dataset 
+			use "`dataset'", clear
 			if `i' == 0 {
 				loc team_name "All"
+				replace team_id == 0
 			}
 			
 			else {
 				loc team_name "`team_`t''"
 			}
-		
+			
+			// Genarate a dummy var for date of hfc
+			gen hfc = datestr == "`hfcdate'"
+			
+			// start log
+			cap log
+			log using "`logfolder'/`hfcdate'/dirtshfc_log_TEAM_`team_name'"
+			
 			// Create Header
 			noi di "{hline 82}"
 			noi di _dup(82) "-"
@@ -118,9 +129,78 @@
 			noi di _dup(82) "*"
 			noi di _dup(82) "-"
 			noi di "{hline 82}"
+			
 
 			
+			/*******************************************************************
+			HFC CHECK #1: SUBMISSION DETAILS
+			*******************************************************************/
 			
+			// Create headers for check
+			check_headers, checknu(1) checkna("SUBMISSIONS PER ENUMERATOR")
+			noi di  
+			noi di as title "enum_id" _column(10) as title "enum_name" _column(20) ///
+				as title "`hfcdate'" _column(30) as title "`all_submission'"
+			
+			levelsof enum_id if team_id == `i', loc (enum_itc) clean
+			foreach enum in `enum_itc' {
+				levelsof enum_name if enum_id == `enum', loc(name) clean
+				
+				count if enum_id == `enum' & hfc
+				loc day_sub `r(N)'
+				
+				count if enum_id == `enum'
+				loc all_sub `r(N)'
+				
+				noi di "`enum'" _column(10) "`name'" _column(20) "`day_sub'" _column(30) "`all_sub'"
+				
+				
+			}
+			
+			
+			/*******************************************************************
+			HFC CHECK #2: DUPLICATES
+			*******************************************************************/
+
+			check_headers, checknu(2) checkna("DUPLICATES ON HHID AND RESPONDENT TYPE")
+			noi di  
+			
+			cap isid hhid resp_type 
+			if !_rc {
+				noi di "Congratulations, Your Team has no duplicates on hhid and resp_type"
+			}
+			
+			else {
+				duplicates tag hhid resp_type, gen (dups)
+				count if dups
+				noi di "There are `r(N)' duplicates on hhid and resp_type, details are as follows"
+				
+				sort hhid resp_type
+				noi di as title "s_key" _column(13) as title "enum_id" _column(18) as title "enum_name" _column(30) ///
+				as title "hhid" _column(38) as title "resp_type" _column(35) as title "resp_name" _column(50) "date_of_interview"
+				
+				levelsof key if dups, loc (keys) clean
+				foreach k in `s_keys' {
+					levelsof s_key if key == `k', loc (s_key) clean
+					levelsof enum_id if key == `k', loc (enum_id) clean
+					levelsof enum_name if key == `k', loc (enum_name) clean
+					levelsof hhid if key == `k', loc (hhid) clean
+					levelsof resp_type if key == `k', loc (resp_type) clean
+					levelsof resp_name if key == `k', loc (resp_name) clean
+					levelsof startdate_str if key == `k', loc (date_of_interview) clean
+					
+					noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
+					"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`date_of_interview'"	
+					
+				}
+			}
+			
+			/*******************************************************************
+			HFC CHECK #3: AUDIO CONSENT RATE
+			*******************************************************************/
+
+		
+		
 		}
 				
 		
@@ -151,7 +231,7 @@ end
 program define check_headers
 
 	syntax, ///
-	CHECKNUmber(string)
+	CHECKNUmber(numeric)
 	CHECKNAme(string)
 	
 	noi di _dup(82) "*"
