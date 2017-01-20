@@ -18,10 +18,12 @@
 	program define dirtshfc_prep
 	
 		syntax,
-		DIRECTory(string)
-		DATAset(string)
-		ENUMDetails(string)
-		SAVing(string)
+		DIRECTory(string) 			///
+		DATAset(string)				///
+		ENUMDetails(string)			///
+		SAVing(string)				///
+		[BCData(string)]			///
+		[BCSsave(string)]
 
 	qui {	
 		
@@ -176,6 +178,24 @@
 		***********************************************************************/
 		
 		save `saving', replace
+		
+		
+		/***********************************************************************
+		Prepare backcheck data for analysis
+		
+		** WORK ON THIS AFTER SEEING THE BACK CHECK DATA**
+		***********************************************************************/
+		
+		// Check that the bcdata option was specified and import bcdata if it was
+		if !mi(`bcdata') {
+			cap use "`bcdata'", clear
+			if _rc == 601 {
+				noi di as err "dirtshfc_prep: Back check dataset (`bcdata') not found"
+				exit 601
+			}
+			
+			// Write prep code for bcdata here
+		}
 	}
 	
 	

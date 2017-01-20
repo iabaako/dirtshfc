@@ -9,7 +9,7 @@
 /* Define sytax for program. 
 */
 
-	program define dirtshfc_clean
+	program define dirtshfc_prep
 	
 		syntax,
 		DIRECTory(string)
@@ -75,7 +75,7 @@
 		
 			/*******************************************************************
 			Import the SCTO generated dataset. This dataset is what is created 
-			after dirtshfc_clean.ado is runned
+			after dirtshfc_prep.ado is runned
 		    ******************************************************************/
 	
 			// Confirm that string specified with directory is an actual directory
@@ -115,9 +115,9 @@
 			noi di _dup(82) "*"
 	
 			noi di "{bf: HIGH FREQUENCY CHECKS FOR DIRTS ANNUAL SURVEY 2017}"
-			noi di _column(50) "{bf:CORRECTIONS LOG}" 
+			noi di _column(10) "{bf:CORRECTIONS LOG}" 
 			noi di
-			noi di "{bf: Date: c(current_date)}"
+			noi di "{bf: Date: `c(current_date)'}"
 	
 			noi di _dup(82) "*"
 			noi di _dup(82) "-"
