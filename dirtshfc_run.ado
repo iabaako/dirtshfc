@@ -133,14 +133,14 @@
 
 			
 			/*******************************************************************
-			HFC CHECK #1: SUBMISSION DETAILS
+			HFC CHECK #1: SUBMISSION DETAILS AND CONSENT RATES
 			*******************************************************************/
 			
 			// Create headers for check
 			check_headers, checknu(1) checkna("SUBMISSIONS PER ENUMERATOR")
 			noi di  
 			noi di as title "enum_id" _column(10) as title "enum_name" _column(20) ///
-				as title "`hfcdate'" _column(30) as title "`all_submission'"
+				as title "hfcdate" _column(30) as title "all_sub" _column(38) as title "consent_rate" 
 			
 			levelsof enum_id if team_id == `i', loc (enum_itc) clean
 			foreach enum in `enum_itc' {
@@ -152,9 +152,11 @@
 				count if enum_id == `enum'
 				loc all_sub `r(N)'
 				
-				noi di "`enum'" _column(10) "`name'" _column(20) "`day_sub'" _column(30) "`all_sub'"
+				count if enum_id == `enum' & consent == 1
+				loc consent_rate `r(N)'
 				
-				
+				noi di "`enum'" _column(10) "`name'" _column(20) "`day_sub'" _column(30) ///
+					"`all_sub'" _column(38) "`consent_rate'"
 			}
 			
 			
@@ -165,51 +167,141 @@
 			check_headers, checknu(2) checkna("DUPLICATES ON HHID AND RESPONDENT TYPE")
 			noi di  
 			
-			cap isid hhid resp_type 
+			cap isid hhid resp_type
 			if !_rc {
 				noi di "Congratulations, Your Team has no duplicates on hhid and resp_type"
 			}
 			
 			else {
 				duplicates tag hhid resp_type, gen (dups)
-				count if dups
-				noi di "There are `r(N)' duplicates on hhid and resp_type, details are as follows"
+				count if dups & team_id == `i'
+				if `r(N)' > 0 {
+					noi di "There are `r(N)' duplicates on hhid and resp_type, details are as follows"
 				
-				sort hhid resp_type
-				noi di as title "s_key" _column(13) as title "enum_id" _column(18) as title "enum_name" _column(30) ///
-				as title "hhid" _column(38) as title "resp_type" _column(35) as title "resp_name" _column(50) "date_of_interview"
+					sort hhid resp_type
+					noi di as title "s_key" _column(13) as title "enum_id" _column(18) as title "enum_name" _column(30) ///
+					as title "hhid" _column(38) as title "resp_type" _column(35) as title "resp_name" _column(50) "date_of_interview"
 				
-				levelsof key if dups, loc (keys) clean
-				foreach k in `s_keys' {
-					levelsof s_key if key == `k', loc (s_key) clean
-					levelsof enum_id if key == `k', loc (enum_id) clean
-					levelsof enum_name if key == `k', loc (enum_name) clean
-					levelsof hhid if key == `k', loc (hhid) clean
-					levelsof resp_type if key == `k', loc (resp_type) clean
-					levelsof resp_name if key == `k', loc (resp_name) clean
-					levelsof startdate_str if key == `k', loc (date_of_interview) clean
+					levelsof key if dups & team_id == `i', loc (keys) clean
+					foreach k in `s_keys' {
+						levelsof s_key if key == `k', loc (s_key) clean
+						levelsof enum_id if key == `k', loc (enum_id) clean
+						levelsof enum_name if key == `k', loc (enum_name) clean
+						levelsof hhid if key == `k', loc (hhid) clean
+						levelsof resp_type if key == `k', loc (resp_type) clean
+						levelsof resp_name if key == `k', loc (resp_name) clean
+						levelsof startdate_str if key == `k', loc (date_of_interview) clean
 					
-					noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
-					"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`date_of_interview'"	
-					
+						noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
+						"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`date_of_interview'"	
+					}
+				}
+				
+				else {
+					noi di "Congratulations, Your Team has no duplicates on hhid and resp_type"
 				}
 			}
 			
 			/*******************************************************************
 			HFC CHECK #3: AUDIO CONSENT RATE
 			*******************************************************************/
+			
+			check_headers, checknu(3) checkna("AUDIO CONSENT RATE")
+			noi di  
+			
+			noi di "Audio consent rates for your team are as follows:"
+			noi di as title "enum_id" _column(8) as title "enum_name" _column(30) ///
+			as title "ac_rate" _column(34) as title "all_sub" 
+			
+			foreach enum of `enum_itc' {
+				
+				levelsof enum_name if enum_id == `enum', loc (name) clean
+				
+				count if enum_id == `enum'
+				loc all_sub `r(N)'
+				
+				count if audio_consent == 1 & enum_id == `enum' 
+				loc ac_rate = round(`all_sub'/`r(N)', 2)
+			
+				noi di "`enum_id'" _column(8) "`enum_name'" _column(30) "`ac_rate'%" _column(34) "`all_sub'" 
+			}
+			
+			/*******************************************************************
+			HFC CHECK #4: FORM VERSIONS
+			*******************************************************************/
+			check_headers, checknu(4) checkna("FORM VERSIONS")
+			noi di  
+			
+			su formdef_version if hfc
+			loc form_vers `r(max)'
+			
+			cap assert formdef_version == `form_vers' if team_id == `i' & hfc
+			if !_rc {
+				noi di "Congratulations, all team members are using the latest form version for `hfcdate'" 
+				noi di "Form Version for `hfcdate': " as result "`form_vers'"
+			}
+			
+			else {
+				
+				noi di "Some members of your team may be using the wrong form version for `hfcdate'" 
+				noi di "Form Version for `hfcdate': " as result "`form_vers'"	
+				
+				noi di as title "enum_id" _column(8) as title "enum_name" _column(30) as title "form_version"
+
+				
+				levelsof enum_id if formdef_version != `form_vers' & team_id == `i' & hfc, loc (enum_rfv) clean
+				foreach enum in `enum_rfv' {
+					levelsof enum_name if enum_id == `enum', loc (enum_name) clean
+					levelsof formdef_version if enum_id == `enum' & formdef_version != `form_version', loc (form_version) clean
+					
+					noi di "`enum_id'" _column(8) "`enum_name'" _column(30) "`form_version'"
+				}
+			}	
+			
+			/*******************************************************************
+			HFC CHECK #5: CHECK SURVEY DATES
+			*******************************************************************/
+
+			
+			/*******************************************************************
+			HFC CHECK #6: DURATION OF SURVEY
+			*******************************************************************/
+			
+			
+			/*******************************************************************
+			HFC CHECK #7: OUTLIERS
+			*******************************************************************/
+			
+			
+			/*******************************************************************
+			HFC CHECK #8: MISSING RATE PER VARIABLE
+			*******************************************************************/
+
+			
+			if `i' == 0 {
+			
+				/***************************************************************
+				THIS IS TO INCLUDE SOME FEW MORE CHECKS FOR PROGRAMMING ERRORS
+				THESE WILL ONLY APPEAR IN THE MASTER LOG SHEET
+				****************************************************************
+				
+				NO MISS:
+				***************************************************************/
+
+				
+				/***************************************************************
+				ALL MISS
+				****************************************************************/
+				
+				
+				/***************************************************************
+				HFC CHECK #7: SKIP
+				****************************************************************/
+
 
 		
-		
 		}
-				
-		
-		
-		
-		
-		
-		
-			
+					
 		/***********************************************************************
 		Save a copy of the data ready for hfc checks
 		***********************************************************************/

@@ -129,10 +129,28 @@
 			(hhid 	  enum_id	)
 			
 		// Enusre that certain variables are numeric 
-		destring enum_id deviceid duration
+		#d;
+			destring
+				enum_id 
+				deviceid 
+				duration
+				formdef_version
+				,
+				replace
+				;
+		#d cr
 		
-		// Drop unwanted vars 
-		drop subscriberid simid devicephonenum username caseid
+		// Drop unwanted vars (add more vars if neccesary)
+		
+		#d;
+			drop 
+				subscriberid 
+				simid 
+				devicephonenum 
+				username 
+				caseid
+				;
+		#d cr
 		
 		// Merge in enum_data 
 		merge m:1 using "`enum_data'", nogen
@@ -171,6 +189,21 @@
 		** THERE MAY BE A NEED TO RESHAPE AND MERGE**
 		***********************************************************************/
 		
+		
+		/***********************************************************************
+		Replace variables which were skipped due to relevance: In some situations
+		The survey will be programmed to skip so that some questions are not 
+		repeated. For instance if the respondent is the household head, there 
+		will be no need to ask for details of the household head after the details
+		of the respondent has already been taken. This is not mearnt to replace 
+		sections that were skipped due to relevance because some surveyors may
+		be answering questions in ways that let them skip certain questions and 
+		it will be good to catch that
+		
+		** WORK ON THIS AFTER SEEING THE IMPORT DATA**
+
+		***********************************************************************/
+
 	
 	
 		/***********************************************************************
