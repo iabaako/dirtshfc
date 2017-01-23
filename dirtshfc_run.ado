@@ -38,13 +38,24 @@
 		import excel using "`enumdetails'", sh(enum_details) case(l) first clear
 		destring *_id, replace
 		
-		tab team_id
-		
 		levelsof team_id, loc (team_ids) clean
 		loc team_cnt: word count `team_ids'
 		
 		foreach t in `team_ids' {
 			levelsof team_name if team_id == `t', loc(team_`t') clean			
+		}
+		
+		/**********************************************************************
+		Import constraint values
+		***********************************************************************/			
+		import excel using "`constraint'", sh(enum_details) case(l) first clear
+		
+		levelsof variable, loc (con_vars) clean
+		foreach v in `con_vars' {
+		
+		///
+		//
+		/ Continue from here
 		}
 		
 		/**********************************************************************
@@ -63,6 +74,9 @@
 			cap confirm file "`dataset'"
 			if !_rc {
 				use "`dataset'", clear
+				
+				// Genarate a dummy var for date of hfc
+				gen hfc = datestr == "`hfcdate'"
 			}
 			
 			// Throw an error if file does not exist
@@ -102,16 +116,14 @@
 			use "`dataset'", clear
 			if `i' == 0 {
 				loc team_name "All"
+				gen team_id_keep == team_id
 				replace team_id == 0
 			}
 			
 			else {
 				loc team_name "`team_`t''"
 			}
-			
-			// Genarate a dummy var for date of hfc
-			gen hfc = datestr == "`hfcdate'"
-			
+						
 			// start log
 			cap log
 			log using "`logfolder'/`hfcdate'/dirtshfc_log_TEAM_`team_name'"
@@ -130,7 +142,6 @@
 			noi di _dup(82) "-"
 			noi di "{hline 82}"
 			
-
 			
 			/*******************************************************************
 			HFC CHECK #1: SUBMISSION DETAILS AND CONSENT RATES
@@ -268,32 +279,90 @@
 			gen start_date = dofc(starttime)
 			gen end_date = dofc(endtime)
 			
-			loc survey_start 
-			loc survey_end 
+			loc survey_start 42795
+			loc survey_end 42839
 			
-			count if start_date < `survey_start' | end_date > `survey_end'
+			loc start_date_str "01_03_17" 
+			loc end_date_str "14_04_17"
+			
+			gen valid_date = start_date < `survey_start' | end_date > `survey_end'
+			count if valid_date & team_id == `i'
 			
 			if `r(N)' == 0 {
 				noi di "Congratulations, start and end dates for all surveys are with the expected range"
 			}
 			
 			else {
-				noi di in red "Some of are outside the expected range `start_date_str' and `end_date_str', details: "
+				noi di in red "Some interview dates are outside the expected range `start_date_str' and `end_date_str', details: "
 				noi di as title "s_key" _column(13) as title "enum_id" _column(18) as title "enum_name" _column(30) ///
-					as title "hhid" _column(38) as title "resp_type" _column(35) as title "resp_name" _column(50) "start_date" ///
-					_column(56) "end_date"
+					as title "hhid" _column(38) as title "resp_type" _column(35) as title "resp_name" _column(50) as title "start_date" ///
+					_column(56) as title "end_date"
 				
-				
-			
-			
-			
+				levelsof key if !valid_date & team_id == `i', loc (keys) clean
+				foreach k in `keys' {
+					levelsof s_key if key == "`k'", loc (s_key) clean
+					levelsof enum_id if key == "`k'", loc (enum_id) clean
+					levelsof enum_name if key == "`k'", loc (enum_name) clean
+					levelsof hhid if key == "`k'", loc (hhid) clean
+					levelsof resp_type if key == "`k'", loc (resp_type) clean
+					levelsof resp_name if key == "`k'", loc (resp_name) clean
+					levelsof startdate_str if key == "`k'", loc (start_date) clean
+					levelsof enddate_str if key == "`k'", loc (end_date) clean
+					
+					noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
+						"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`start_date'" ///
+						_column(56) "`end_date'"
+					
+				}
 			}
-
+			
+			drop valid_date
 			
 			/*******************************************************************
 			HFC CHECK #6: DURATION OF SURVEY
 			*******************************************************************/
+			check_headers, checknu(6) checkna("DURATION OF SURVEY")
+			noi di  
 			
+			su dur_min
+			loc dur_mean `r(mean)'
+			loc valid_dur = `dur_mean' - 60
+			gen invalid_dur = dur_min < `valid_dur'
+			
+			count if invalid_dur & hfc & team_id == `i'
+			if `r(N)' == 0 {
+				noi di "Congratulations, all members of your team administered the survey within an acceptable duration"
+				noi di "Average time per survey is: `dur_mean'"
+			
+			}
+			
+			else {
+				noi di in red "Durations for the following surveys are too short, average time per survey is `dur_mean'"
+				
+				noi di "s_key" _column(13) "enum_id" _column(18) "enum_name" _column(30) ///
+				"hhid" _column(38) "resp_type" _column(35) "resp_name" _column(50) "duration" ///
+					_column(56) "start_date"
+
+				levelsof key if invalid_dur & hfc & team_id == `i', loc (keys) clean
+				foreach k in `keys' {
+					levelsof s_key if key == "`k'", loc (s_key) clean
+					levelsof enum_id if key == "`k'", loc (enum_id) clean
+					levelsof enum_name if key == "`k'", loc (enum_name) clean
+					levelsof hhid if key == "`k'", loc (hhid) clean
+					levelsof resp_type if key == "`k'", loc (resp_type) clean
+					levelsof resp_name if key == "`k'", loc (resp_name) clean
+					levelsof dur_min if key == "`k'", loc (dur_min) clean
+					levelsof startdate_str if key == "`k'", loc (start_date) clean
+					
+					noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
+						"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`dur_min'" ///
+						_column(56) "`start_date'"
+
+				}
+				
+			}	
+			
+			drop invalid_dur
 			
 			/*******************************************************************
 			HFC CHECK #7: SOFT CONSTRAINT VIOLATIONS
@@ -310,7 +379,7 @@
 				
 				
 				/***************************************************************
-				HFC CHECK #7: SOFT CONSTRAINT VIOLATIONS
+				HFC CHECK #7: HARD CONSTRAINT VIOLATIONS
 				****************************************************************/
 				
 				
@@ -334,26 +403,31 @@
 				****************************************************************/
 				
 				
-
-				/***************************************************************
-				SKIP. 
-				
-				Check the responses to questions which may trigger large sections 
-				of repeat groups and export the answers to excel sheet
-				****************************************************************/
 				
 				
-				
-				/***************************************************************
-				MISSING RATE PER VARIABLE
-				Check for rate at which each variable is missing per enumerator
-				and export the answeres to a an excel sheet
-				****************************************************************/
-			
-
-
+				// return team_ids to their original form
+				replace team_id == team_id_keep
+				drop team_id_keep
+			}
 		
 		}
+		
+		
+		/**********************************************************************/
+		SKIP. 
+				
+		Check the responses to questions which may trigger large sections 
+		of repeat groups and export the answers to excel sheet
+		***********************************************************************/
+				
+				
+				
+		/**********************************************************************
+		MISSING RATE PER VARIABLE
+		Check for rate at which each variable is missing per enumerator
+		and export the answeres to a an excel sheet
+		***********************************************************************/
+
 					
 		/***********************************************************************
 		Save a copy of the data ready for hfc checks
