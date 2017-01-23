@@ -176,7 +176,7 @@
 				duplicates tag hhid resp_type, gen (dups)
 				count if dups & team_id == `i'
 				if `r(N)' > 0 {
-					noi di "There are `r(N)' duplicates on hhid and resp_type, details are as follows"
+					noi di in red "There are `r(N)' duplicates on hhid and resp_type, details are as follows"
 				
 					sort hhid resp_type
 					noi di as title "s_key" _column(13) as title "enum_id" _column(18) as title "enum_name" _column(30) ///
@@ -243,8 +243,8 @@
 			
 			else {
 				
-				noi di "Some members of your team may be using the wrong form version for `hfcdate'" 
-				noi di "Form Version for `hfcdate': " as result "`form_vers'"	
+				noi di in red "Some members of your team may be using the wrong form version for `hfcdate'" 
+				noi di in red "Form Version for `hfcdate': " as result "`form_vers'"	
 				
 				noi di as title "enum_id" _column(8) as title "enum_name" _column(30) as title "form_version"
 
@@ -260,7 +260,34 @@
 			
 			/*******************************************************************
 			HFC CHECK #5: CHECK SURVEY DATES
+			Check that survey dates fall with reasonabel minimum and maximum dates
 			*******************************************************************/
+			check_headers, checknu(5) checkna("DATES")
+			noi di  
+			
+			gen start_date = dofc(starttime)
+			gen end_date = dofc(endtime)
+			
+			loc survey_start 
+			loc survey_end 
+			
+			count if start_date < `survey_start' | end_date > `survey_end'
+			
+			if `r(N)' == 0 {
+				noi di "Congratulations, start and end dates for all surveys are with the expected range"
+			}
+			
+			else {
+				noi di in red "Some of are outside the expected range `start_date_str' and `end_date_str', details: "
+				noi di as title "s_key" _column(13) as title "enum_id" _column(18) as title "enum_name" _column(30) ///
+					as title "hhid" _column(38) as title "resp_type" _column(35) as title "resp_name" _column(50) "start_date" ///
+					_column(56) "end_date"
+				
+				
+			
+			
+			
+			}
 
 			
 			/*******************************************************************
@@ -269,14 +296,10 @@
 			
 			
 			/*******************************************************************
-			HFC CHECK #7: OUTLIERS
+			HFC CHECK #7: SOFT CONSTRAINT VIOLATIONS
 			*******************************************************************/
 			
 			
-			/*******************************************************************
-			HFC CHECK #8: MISSING RATE PER VARIABLE
-			*******************************************************************/
-
 			
 			if `i' == 0 {
 			
@@ -285,18 +308,48 @@
 				THESE WILL ONLY APPEAR IN THE MASTER LOG SHEET
 				****************************************************************
 				
+				
+				/***************************************************************
+				HFC CHECK #7: SOFT CONSTRAINT VIOLATIONS
+				****************************************************************/
+				
+				
 				NO MISS:
+				Check that certain critical values have no missing values
 				***************************************************************/
 
 				
 				/***************************************************************
-				ALL MISS
+				ALL MISS. 
+				Display variables that have all missing values
 				****************************************************************/
+				
+				
 				
 				
 				/***************************************************************
-				HFC CHECK #7: SKIP
+				OTHER SPECIFY
+				Check that field staff are not using other specify for options that
+				are already listed in the survey
 				****************************************************************/
+				
+				
+
+				/***************************************************************
+				SKIP. 
+				
+				Check the responses to questions which may trigger large sections 
+				of repeat groups and export the answers to excel sheet
+				****************************************************************/
+				
+				
+				
+				/***************************************************************
+				MISSING RATE PER VARIABLE
+				Check for rate at which each variable is missing per enumerator
+				and export the answeres to a an excel sheet
+				****************************************************************/
+			
 
 
 		

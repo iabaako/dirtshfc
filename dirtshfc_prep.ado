@@ -256,7 +256,7 @@ program define datestr
 			}
 			
 			generate `newvar' = day + "_" + mon + "_" + year
-			drop `newvar'_*
+			drop `newvar'_* dofc_temp
 
 		}
 end
