@@ -1,0 +1,7 @@
+v 3
+d HFC for DIRTS Annual Survey 2017
+f dirtshfc_prep.ado
+f dirtshfc_correct.ado
+f dirtshfc_run.ado
+f dirtshfc_err_rates.ado
+f dirtshfc_clean.ado
