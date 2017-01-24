@@ -17,3 +17,7 @@ The repository will a do file **00_master** and 5 ado files. The ado files will 
 
 ## dirtshfc_clean
   * Do final cleaning on data. Also save a non pii version of the dataset 
+
+
+## Install
+`net install dirtshfc, all replace from(https://raw.githubusercontent.com/iabaako/dirtshfc/master)`
