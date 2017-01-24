@@ -1,7 +1,7 @@
 # dirtshfc
 Stata Files for High Frequency Checks, Annual Survey 2017
 
-The repository will a do file **00_master** and 5 ado files. The ado files will include:
+The repository will a do file **00_dirtshfc_master** and 5 ado files. The ado files will include:
 
 ## dirtshfc_prep
   * Prepare dataset and bc dataset from surveycto for hfc and bc. A file **dirts_annual_17_preped.dta** will be saved
