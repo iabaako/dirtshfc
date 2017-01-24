@@ -16,6 +16,7 @@
 		DATAset(string)
 		LOGFolder(string)
 		HFCDate(string)
+		MISSFile(string)
 
 	qui {	
 		
@@ -563,23 +564,42 @@
 		save "`saving'", replace
 
 		
-		
-		
-		/**********************************************************************
-		SKIP. 
-				
-		Check the responses rates to questions which may trigger large sections 
-		of repeat groups and export the answers to excel sheet
-		***********************************************************************/
-				
-				
-				
 		/**********************************************************************
 		MISSING RATE PER VARIABLE
 		Check for rate at which each variable is missing per enumerator
 		and export the answeres to a an excel sheet
 		***********************************************************************/
 		
+		#d;
+			ds
+				deviceid
+				enum_*
+				,
+				not
+			;
+		#d cr
+		
+		loc mr_vars "`r(varlist)'"
+		foreach var of `ma_vars' {
+			cap assert string var `var' 
+			if !_rc {
+				replace `var' = "1" if mi(`var')
+				replace `var' = "0" if mi(`var')
+			}
+			
+			else {
+				replace `var' = 1 if mi(`var')
+				replace `var' = 0 if mi(`var')
+			}
+			
+			destring `var', replace
+			su `var'
+			replace `var' = `r(mean)'
+		}
+		
+		format %5.2 `mr_vars'
+		
+		export excel `mr_vars' using "`missfile'", first(var) sheetmod
 		
 		// return to starting directory
 		cd "`hfcpwd'"
