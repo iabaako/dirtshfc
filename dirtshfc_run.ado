@@ -50,13 +50,33 @@
 		***********************************************************************/			
 		import excel using "`constraint'", sh(enum_details) case(l) first clear
 		
-		levelsof variable, loc (con_vars) clean
-		foreach v in `con_vars' {
+		count if !mi(variable)
+		loc v_cnt `r(N)'
 		
-		///
-		//
-		/ Continue from here
+		forval i = 1/`v_cnt' {
+			loc v_name = variable[`i']
+			
+			loc s_ch = substr("`v_name'", -1, .)
+			if "`s_ch'" == "*" {
+				foreach var of varlist `v_name' {
+					loc `var'_hmin = hard_min[`i']
+					loc `var'_smin = soft_min[`i']
+					loc `var'_smax = soft_max[`i']
+					loc `var'_hmax = hard_max[`i']
+					loc `var'_lab = var_label[`i']
+				}
+			}
+			
+			else {
+				loc `v_name'_hmin = hard_min[`i']
+				loc `v_name'_smin = soft_min[`i']
+				loc `v_name'_smax = soft_max[`i']
+				loc `v_name'_hmax = hard_max[`i']
+				loc `v_name'_lab = var_label[`i']
+			}
 		}
+		
+		levelsof variable if !mi(variable), loc (v_names) clean
 		
 		/**********************************************************************
 		Import the SCTO generated dataset. This dataset is what is created 
@@ -357,7 +377,6 @@
 					noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
 						"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`dur_min'" ///
 						_column(56) "`start_date'"
-
 				}
 				
 			}	
@@ -367,56 +386,189 @@
 			/*******************************************************************
 			HFC CHECK #7: SOFT CONSTRAINT VIOLATIONS
 			*******************************************************************/
+			check_headers, checknu(7) checkna("SOFT CONSTRAINT")
+			noi di  
 			
-			
+			foreach var of varlist `v_names' {
+				su `var'
+				loc `var'_mean `r(mean)'
+				gen flag = (`var' < ``var'_smin' | `var' > ``var'_smax') & team_id == `i'
+				count if flag
+				if `r(N)' == 0 {
+					noi di "Congratulations, your team has no soft constraint violations"
+				}
+				
+				else {
+					noi di in red "The following are soft constraint violations on variable `var'"
+					noi di "{p} Variable Description: ``var'_label' {smcl}"
+					noi di "Expected Range: " _column(18) "``var'_smin' - ``var'_smax'"
+					noi di "Average Value: " _column(18) "``var'_mean'"
+					noi di
+					
+					noi di "s_key" _column(13) "enum_id" _column(18) "enum_name" _column(30) ///
+					"hhid" _column(38) "resp_type" _column(35) "resp_name" _column(50) "value"
+					
+					levelsof key if flag, loc (keys) clean
+					foreach k in `keys' {
+						levelsof s_key if key == "`k'", loc (s_key) clean
+						levelsof enum_id if key == "`k'", loc (enum_id) clean
+						levelsof enum_name if key == "`k'", loc (enum_name) clean
+						levelsof hhid if key == "`k'", loc (hhid) clean
+						levelsof resp_type if key == "`k'", loc (resp_type) clean
+						levelsof resp_name if key == "`k'", loc (resp_name) clean
+						levelsof `var' if key == "`k'", loc (value) clean
+					
+						noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
+							"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`value'"
+					}				
+				}
+				
+				drop flag
+			}			
 			
 			if `i' == 0 {
 			
 				/***************************************************************
 				THIS IS TO INCLUDE SOME FEW MORE CHECKS FOR PROGRAMMING ERRORS
 				THESE WILL ONLY APPEAR IN THE MASTER LOG SHEET
-				****************************************************************
-				
-				
-				/***************************************************************
-				HFC CHECK #7: HARD CONSTRAINT VIOLATIONS
+				***************************************************************
+				HARD CONSTRAINT VIOLATIONS
 				****************************************************************/
-				
-				
+				check_headers, checknu(8) checkna("HARD CONSTRAINT")
+				noi di  
+			
+				foreach var of varlist `v_names' {
+					su `var'
+					loc `var'_mean `r(mean)'
+					gen flag = `var' < ``var'_hmin' | `var' > ``var'_hmax'
+					count if flag
+					
+					if `r(N)' == 0 {
+						noi di "Congratilations, there are no hard constraint violations"
+					}
+					
+					else {
+						noi di in red "The following are hard constraint violations on variable `var'. Please check Survey programming"
+						noi di "{p} Variable Description: ``var'_label' {smcl}"
+						noi di "Expected Range: " _column(18) "``var'_hmin' - ``var'_hmax'"
+						noi di "Average Value: " _column(18) "``var'_mean'"
+						noi di
+					
+						noi di "s_key" _column(13) "enum_id" _column(18) "enum_name" _column(30) ///
+						"hhid" _column(38) "resp_type" _column(35) "resp_name" _column(50) "value"
+					
+						levelsof key if flag, loc (keys) clean
+						foreach k in `keys' {
+							levelsof s_key if key == "`k'", loc (s_key) clean
+							levelsof enum_id if key == "`k'", loc (enum_id) clean
+							levelsof enum_name if key == "`k'", loc (enum_name) clean
+							levelsof hhid if key == "`k'", loc (hhid) clean
+							levelsof resp_type if key == "`k'", loc (resp_type) clean
+							levelsof resp_name if key == "`k'", loc (resp_name) clean
+							levelsof `var' if key == "`k'", loc (value) clean
+					
+							noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
+								"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`value'"
+						}				
+					}
+					drop flag
+				}			
+
+				/***************************************************************
 				NO MISS:
 				Check that certain critical values have no missing values
 				***************************************************************/
+				check_headers, checknu(9) checkna("NO MISS")
+				noi di  
 
+				
+				#d;
+					loc nm_var
+							hhid
+							resp_name
+							resp_type
+							;
+				#d cr
+				
+				foreach var in `nm_vars' {
+					loc nm_track 0
+					
+					cap assert !mi(`var')
+					if _rc == 9 {
+						loc ++nm_track
+					}
+					
+					if `nm_track' == 0 {
+						noi di "Congratulations, all critical variables do not have missing values"
+					}
+					
+					else {
+						noi di "{p} `nm_track' critical variables have missing values in some observations, check survey programming. Details are listed below: {smcl}"
+						noi di as title "variable" _column(30) as title "variable_label"
+					
+						foreach var in `nm_vars' {
+							cap assert !mi(`var')
+							if _rc == 9 {
+								loc var_lab: variable label `var'
+								noi di "`var'" _column(30) "{p} `var_lab' {smcl}"
+							}					
+						}
+					}
+				}
 				
 				/***************************************************************
 				ALL MISS. 
 				Display variables that have all missing values
 				****************************************************************/
+				check_headers, checknu(10) checkna("ALL MISS")
+				noi di  
 				
+				foreach var in `nm_vars' {
+					loc am_track 0
+					
+					cap assert mi(`var')
+					if !_rc {
+						loc ++am_track
+					}
+					
+					if `am_track' == 0 {
+						noi di "Congratulations, There are no variables with all missing values"
+					}
+					
+					else {
+						noi di "{p} `am_track' variables have all missing values , check survey programming. Details are listed below: {smcl}"
+						noi di as title "variable" _column(30) as title "variable_label"
+					
+						foreach var in `nm_vars' {
+							cap assert mi(`var')
+							if !_rc {
+								loc var_lab: variable label `var'
+								noi di "`var'" _column(30) "{p} `var_lab' {smcl}"
+							}					
+						}
+					}
+				}
 				
-				
-				
-				/***************************************************************
-				OTHER SPECIFY
-				Check that field staff are not using other specify for options that
-				are already listed in the survey
-				****************************************************************/
-				
-				
-				
-				
-				// return team_ids to their original form
-				replace team_id == team_id_keep
-				drop team_id_keep
 			}
 		
 		}
 		
+		/***********************************************************************
+		Save a copy of the data ready for hfc checks
+		***********************************************************************/
+		// Close log
+		log close
 		
-		/**********************************************************************/
+		// Save file
+		save "`saving'", replace
+
+		
+		
+		
+		/**********************************************************************
 		SKIP. 
 				
-		Check the responses to questions which may trigger large sections 
+		Check the responses rates to questions which may trigger large sections 
 		of repeat groups and export the answers to excel sheet
 		***********************************************************************/
 				
@@ -427,18 +579,7 @@
 		Check for rate at which each variable is missing per enumerator
 		and export the answeres to a an excel sheet
 		***********************************************************************/
-
-					
-		/***********************************************************************
-		Save a copy of the data ready for hfc checks
-		***********************************************************************/
-
 		
-		// Close log
-		log close
-		
-		// Save file
-		save "`saving'", replace
 		
 		// return to starting directory
 		cd "`hfcpwd'"
