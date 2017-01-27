@@ -292,7 +292,7 @@
 			
 			/*******************************************************************
 			HFC CHECK #5: CHECK SURVEY DATES
-			Check that survey dates fall with reasonabel minimum and maximum dates
+			Check that survey dates fall with reasonable minimum and maximum dates
 			*******************************************************************/
 			check_headers, checknu(5) checkna("DATES")
 			noi di  
