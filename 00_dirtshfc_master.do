@@ -1,20 +1,13 @@
 /*******************************************************************************
---------------------------------------------------------------------------------
-Title:		| HIGH FREQUENCY CHECKS
-------------|--------
-Projects: 	| DIRTS
-------------|--------
-Purpose:	| Run High Frequency Checks for DIRTS Annual Survey 2017. Outputs are 
-			| logged in .xlsx and smcl formats and disaggregated b teams
-------------|--------
-Authors: 	| Ishmail Azindoo Baako (iabaako@poverty-action.org)
-			|	Survey Coordinator, IPA-Ghana
-			|	
-			| Vincent Armentano (varmentano@poverty-action.org)
-			| 	Research Analyst, IPA - NH			
-------------|--------
-Date:		| January, 2017
---------------------------------------------------------------------------------
+# Title:	HIGH FREQUENCY CHECKS
+# Projects: DIRTS
+# Purpose:	Run High Frequency Checks for DIRTS Annual Survey 2017. Outputs are 
+#				logged in .xlsx and smcl formats and disaggregated b teams
+# Authors: 	Ishmail Azindoo Baako (iabaako@poverty-action.org)
+#				Survey Coordinator, IPA-Ghana	
+#			Vincent Armentano (varmentano@poverty-action.org)
+#				Research Analyst, IPA - NH			
+# Date:		January, 2017
 ********************************************************************************
 SETTING THE STAGE
 *******************************************************************************/
@@ -90,8 +83,9 @@ RENAME AUDIO FILES
 /*******************************************************************************
 CLEAN DATASET
 *******************************************************************************/
+if "`c(username)'"=="Vinny" {
 
-
+}
 
 /*******************************************************************************
 BACK-UP DATA
