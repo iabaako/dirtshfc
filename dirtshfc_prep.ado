@@ -30,9 +30,6 @@
 		/***********************************************************************
 		Set the stage
 		***********************************************************************/
-		* Save the name of the present working directory
-		loc hfcpwd = c(pwd)
-		
 		* Check that the directory specified as is encrypted with Boxcryptor
 		loc pathx = substr("`using'", 1, 1)
 		if `pathx' != "X" {
@@ -246,7 +243,7 @@ prog def datestr
 			* Change the month var to a short mon in word. For instance 2 to Feb
 			loc it 1
 			foreach dt in `c(Mons)' {
-				replace `newvar'_mon = "`dt'" if `newvar' == `it'
+				replace `newvar'_mon = "`dt'" if `newvar' == "`it'"
 				loc ++it
 			}
 
