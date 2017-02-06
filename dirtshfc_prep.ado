@@ -1,44 +1,48 @@
-*! version 0.0.4 Ishmail Azindoo Baako (IPA) Jan, 2016
+*! version 0.0.5 Ishmail Azindoo Baako (IPA) Feb, 2016
 
 /* 
 	This stata program is part of the HFC for the DIRTS Annual Survey 2017. 
 	
 	This will clean scto generated .dta file for the dirts annual survey and prep
-	the data for HFC checks. A clean pre_hfc .dta file will be saved after this.
-*/ 
+	the data for HFC corrections(if neccesary). 
 
-/* Define sytax for program. varname will be the id var of the observation, for 
-	cleaning stage of the hfc, the id var determined by the survey team is not
-	expected to be unique as multiple submissions may cause duplication in the 
-	id variables defined for the survey. We will be using the scto generated key
-	instead. The NEWID will be a shorter version of the ID var that will be gened
-	and saved in the new semi cleaned dataset
+	Define sytax for program. 
+	using		: SCTO generated .dta file for survey
+	enumvars	: Enumerator variables. The enumerator id and then enumerator name
+					variables are espected here. eg. enumv(enum_id enum_name)
+	enumdetails	: Data Source for Enumerator Details
+	saving		: Name for saving post preped survey dataset
+	bcdata		: SCTO generated .dta file for BC data
+	bcsave		: Name for saving post preped bc dataset
 */
 
-	program define dirtshfc_prep
+	prog def dirtshfc_prep
 	
-		syntax,
-		DIRECTory(string) 			///
-		DATAset(string)				///
-		ENUMDetails(string)			///
-		SAVing(string)				///
-		[BCData(string)]			///
-		[BCSsave(string)]
+		syntax using/,
+		ENUMVars(varlist min=2 max=2)	///
+		ENUMDetails(string)				///
+		SAVing(string)					///
+		[BCData(string)]				///
+		[BCSave(string)]
 
 	qui {	
 		
 		/***********************************************************************
 		Set the stage
 		***********************************************************************/
-		// Save the name of the present working directory
+		* Save the name of the present working directory
 		loc hfcpwd = c(pwd)
 		
-		// Check that the directory specified as is encrypted with Boxcryptor
-		loc pathx = substr("`directory'", 1, 1)
+		* Check that the directory specified as is encrypted with Boxcryptor
+		loc pathx = substr("`using'", 1, 1)
 		if `pathx' != "X" {
-			noi di as err "dirtshfc_prep: Hello!! Folder specified with directory must be BOXCRYPTED"
+			noi di as err "dirtshfc_prep: Hello!! Using Data must be in a BOXCRYPTED folder"
 			exit 601
 		}
+		* Get the enumerator related vars from arg enumvars
+		token `enumvars'
+		loc enum_id "`1'"				// Enumerator ID
+		loc enum_name "`2'"				// Enumerator Name
 		
 		/***********************************************************************
 		Import enumerator details and save it in a tempfile
@@ -47,91 +51,87 @@
 		
 		import excel using "`enumdetails'", sh(enum_details) case(l) first clear
 		destring *_id, replace
-		save `enum_data'
+		ren (enum_id enum_name) (`enum_id' `enum_name')
+		drop if mi(`enum_id')
+				
+		cap isid `enum_id' 
+		if _rc {
+			duplicates tag `enum_id', gen(dup)
+			sort `enum_id'
+			noi di in red "dirtshfc_prep: Variable `enum_id' is not UNIQUE"
+			noi di
+			noi list `enum_id' `enum_name' if dups, sepby(`enum_id')
+			noi di
+			noi di as err "{p} Please ensure that all Field Staff have one Unique _ID, " ///
+				"if you added a new Field Staff assign a new ID to that field staff." ///
+				"Re-run the master do-file when this is done.{smcl}"
+			exit 459
+		}
+		
+		* Save the dataset in a temp_file if there is no error
+		else {
+			save `enum_data'
+		}
 		
 		/***********************************************************************
 		Import the SCTO generated dataset. This dataset is what is created after 
 		running the SCTO generated import do-files
 		***********************************************************************/
 	
-		// Confirm that string specified with directory is an actual directory
-		cap confirm file "`directory'/nul"
-		if !_rc {
-			
-			// Change working directory to the data directory if directory exist
-			cd "`directory'"
-			
-			cap confirm file "`dataset'"
+		* Confirm that string specified with directory is an actual directory
+		cap confirm file "`using'"
 			if !_rc {
-				use "`dataset'", clear
+				use "`using'", clear
 			}
 			
-			// Throw and error if file does not exist
+			* Throw and error if file does not exist
 			else {
-			
-				noi di as err "dirtshfc_prep: File `dataset' not found in `directory'"
+				noi di as err "dirtshfc_prep: File `using' not found"
 				exit 601
 			}
 		}
 		
-		// If directory does not exist
-		else {
-			
-			noi di as err "`directory' does not found"
-			exit 601
-		}
-		
-		
-		// Check that the dataset contains some data
+		* Check that the dataset contains some data
 		if (_N==0) {
-			noi di as error "dirtshfc_prep: no observation"
+			noi di as error "dirtshfc_prep: Imported Data from SCTO has no observation"
 			exit 2000
 		}
 		
-		// Check that the dataset contains the key var. Generate s_key if yes or 
-		// Stop if id does. 
-		
+		* Check that the dataset contains the key var and then generate skey
 		cap confirm var key
 		if !_rc {
-			
-			// First confirm that s_key is unique for this dataset. It usually is
+			* First confirm that skey is unique for this dataset. It usually is
 			cap isid key
 			if !_rc {
-				
 				/* generate a shorter key. This will be easier for field teams 
-				to work with. There is a chance that that the s_key may not be
+				to work with. There is a chance that that the skey may not be
 				unique, but it should always be if combined with id var. */
 				
 				gen s_key = substr(key, -12, .)
 			}
 			
+			* Stop running if key is not unique
 			else {
-				noi di as err "dirtshfc_prep: variable key does not uniquely identify the observations"
+				noi di as err "dirtshfc_prep: FATAL ERROR!! Variable KEY does not UNIQUELY identify the observations"
+				noi di as err "Contact Ishmail or Vinney Immediately"
 				exit 459
 			}
 		}
 		
 		else {
-			noi di as err "dirtshfc_prep: variable key not found"
+			noi di as err "dirtshfc_prep: FATAL ERROR!! variable KEY is MISSING from dataset"
+			noi di as err "Contact Ishmail or Vinney Immediately"
 			exit 111
 		}
 		
 		/**********************************************************************
-		Rename relevant variables, change var typesdrop unwanted vars and merge 
-		in the enum_details dataset
-		
-		**ADD SOME MORE VARS TO REN AND DROP AFTER LOOKING AT THE ACTUAL DATA**
+		Change var types, drop unwanted vars and merge with the enum_details dataset
 		***********************************************************************/
-		
-		// Rename relevant vars. 
-		
-		ren (FPrimary s_suv_name) ///
-			(hhid 	  enum_id	)
 			
-		// Enusre that certain variables are numeric 
+		* Ensure that certain variables are numeric 
 		#d;
 			destring
-				enum_id 
+				`enum_id' 
 				deviceid 
 				duration
 				formdef_version
@@ -140,8 +140,7 @@
 				;
 		#d cr
 		
-		// Drop unwanted vars (add more vars if neccesary)
-		
+		* Drop unwanted vars (add more vars if neccesary)
 		#d;
 			drop 
 				subscriberid 
@@ -152,41 +151,42 @@
 				;
 		#d cr
 		
-		// Merge in enum_data 
-		merge m:1 using "`enum_data'", nogen
+		* Merge in enum_data 
+		merge m:1 `enum_id' using "`enum_data'", nogen
+		
+		* Drop the enum_data from memory
+		macro drop `enum_data'
+		
 		/***********************************************************************
 		Format date and time variables and create a string date var in the format
-		dd_mm_yy
+		dd_mm_yy (06_Feb_17)
 		***********************************************************************/
 		
 		datestr submissiondate, newvar(subdate_str)
 		datestr starttime, newvar(startdate_str)
 		datestr endtime, newvar(enddate_str)
 		
-		
 		/***********************************************************************
-		Drop observations that are as a result of duplicate submission. In such 
-		situatitions the duration and as hhid will be the same
+		Rename duration var to dur and convert create a new duration varation 
+		that contains the duration in minutes
 		***********************************************************************/
-		cap isid hhid duration
-		if _rc == 459 {
-			noi di in red "Dropping some duplicate submissions based on hhid and duration"
-			duplicates drop hhid duration, force
-		}
+		rename duration dur
+		la var dur "Survey CTO generated duration in seconds"
 		
 		// Generate a dur_min variable
-		gen dur_min = floor(duration/60)
-		
+		gen duration = floor(duration/60)
+		la var duration "Survey duration in full minutes. Estimated from variable dur"
 		
 		/***********************************************************************
 		Drop Unneeded observations in repeat groups. Sometimes repeat groups 
 		may contain unneeded information because the surveyor mistakenly opened
 		a repeat group and started entering some information into it before 
-		realising that they didnt need it. IN some cases if the repeat group is
-		closed without removing the information, it stays in the data. 
+		realising that they didnt need it. In some cases if the repeat group is
+		closed without removing the information, it already entered information
+		appears in the dataset.
 		
-		** WORK ON THIS AFTER SEEING THE IMPORT DATA**
-		** THERE MAY BE A NEED TO RESHAPE AND MERGE**
+		* First, remove excess repeat groups
+		* Second, remove values in repeat groups that are not really needed
 		***********************************************************************/
 		
 		
@@ -195,19 +195,13 @@
 		The survey will be programmed to skip so that some questions are not 
 		repeated. For instance if the respondent is the household head, there 
 		will be no need to ask for details of the household head after the details
-		of the respondent has already been taken. This is not mearnt to replace 
-		sections that were skipped due to relevance because some surveyors may
-		be answering questions in ways that let them skip certain questions and 
-		it will be good to catch that
-		
-		** WORK ON THIS AFTER SEEING THE IMPORT DATA**
-
+		of the respondent has already been taken. 
 		***********************************************************************/
 
 	
 	
 		/***********************************************************************
-		Save a copy of the data ready for correction
+		Save data
 		***********************************************************************/
 		
 		save `saving', replace
@@ -219,15 +213,18 @@
 		** WORK ON THIS AFTER SEEING THE BACK CHECK DATA**
 		***********************************************************************/
 		
-		// Check that the bcdata option was specified and import bcdata if it was
-		if !mi(`bcdata') {
+		* Check that the bcdata option was specified and import bcdata if it was
+		if !mi("`bcdata'") {
 			cap use "`bcdata'", clear
 			if _rc == 601 {
 				noi di as err "dirtshfc_prep: Back check dataset (`bcdata') not found"
 				exit 601
 			}
 			
-			// Write prep code for bcdata here
+			else {
+				* Write prep code for bcdata here
+				
+			}
 		}
 	}
 	
@@ -235,27 +232,32 @@
 end
 
 
-program define datestr
+prog def datestr
 
 		syntax varname, newvar(string)
 		
 		qui {
-		
-			// Use a tempvar to save the dofc format of the date var
 			gen dofc_temp = dofc(`varlist')
-			
 			gen `newvar'_day = day(`dofc_temp')
 			gen `newvar'_mon = month(`dofc_temp')
 			gen `newvar'_yr = year(`dofc_temp')
-			
 			tostring `newvar'_*, replace
+			
+			* Change the month var to a short mon in word. For instance 2 to Feb
+			loc it 1
+			foreach dt in `c(Mons)' {
+				replace `newvar'_mon = "`dt'" if `newvar' == `it'
+				loc ++it
+			}
+
 			replace `newvar'_yr = substr(yr,3, .)
 			
-			foreach ds_var of varlist `newvar'_* {
-				replace `ds_var' = 0 + `ds_var' if length(`ds_var') == 1
+			foreach dsv of varlist `newvar'_* {
+				replace `dsv' = 0 + `dsv' if length(`dsv') == 1
 			}
 			
 			generate `newvar' = day + "_" + mon + "_" + year
+			replace `newvar' = upper(`newvar')
 			drop `newvar'_* dofc_temp
 
 		}
