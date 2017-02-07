@@ -30,19 +30,19 @@
 		***********************************************************************/
 		* Check that the data specified is in a boxcrypted folder
 		loc pathx = substr("`directory'", 1, 1)
-		if `pathx' != "X" {
+		if `pathx' != "X" & `pathx' != "." {
 			noi di as err "dirtshfc_correct: Hello!! Using Data must be in a BOXCRYPTED folder"
 			exit 601
 		}
 		
 		* Represent the id var with the local id
-		loc id `varname'
+		loc id `varlist'
 		
 		/***********************************************************************
 		Import corrections file details and save it in a tempfile
 		***********************************************************************/
 		tempfile corr_data 
-		import excel using "`corrections'", sh(enum_details) case(l) first clear
+		import exc using "`corrections'", sh(enum_details) case(l) first clear
 		
 		* Check that the dataset contains some data. If not skip correctiosn
 		if (_N==0) {
@@ -133,7 +133,7 @@
 				}
 
 				* Load dataset and mark as okay. For each var, create a var *_ok
-				use "`dataset'", clear
+				use "`using'", clear
 				forval i = 1/`hfc_okay' {
 				
 					* Check that the entries in the correction sheets are valid
@@ -170,7 +170,13 @@
 					noi di as title "`skey_`i''" _column(15) as title "``id'_`i''" _column(25) ///
 						as title "`variable_`i''" _column(40) as title "`value_`i''"
 				}
-			
+				
+				* save dataset
+				save "`saving'", replace
+				
+				* drop macros
+				macro drop _skey_* _`id'_* _variable_* _value'_*
+	
 			}
 			
 			noi di
@@ -216,6 +222,11 @@
 					noi di as "`skey_`i'" _column(15) "``id'_`i''"
 				}
 				
+				* save dataset
+				save "`saving'", replace
+				
+				* drop macros
+				macro drop _skey_* _`id'_* _variable_* _value'_*
 			}
 			
 			noi di 
@@ -238,19 +249,19 @@
 					loc `id'_`i' = `id'[`i']
 					loc variable_`i' = variable[`i']
 					loc value_`i' = value[`i']
-					loc new_value_`i' = value[`i']
+					loc new_value_`i' = new_value[`i']
 				}
 
 				
 				* Check that the entries in the correction sheets are valid
-				foreach name in "`s_key_`i''" "`hhid_`i''" "`variable_`i''" "`value'_`i'" "`new_value_`i''" {	
+				foreach name in "`skey_`i''" "``id'_`i''" "`variable_`i''" "`value'_`i'" "`new_value_`i''" {	
 					* Get the actual name of the variable
 					loc name = substr("`name'", 1, length(`name') - length(`i')) 
 						
 					* Check that value is in the dataset before dropping
 					cap assert `name' != "``name'_`i''"
 					if !_rc {
-						noi di as err "dirtshfc_correct: Wrong s_key(``name'_`i'') specified in correction sheet"
+						noi di as err "dirtshfc_correct: Wrong skey(``name'_`i'') specified in correction sheet"
 						exit 9
 					}
 				}
@@ -268,12 +279,9 @@
 						
 				noi di as title "`skey_`i''" _column(15) as title "``id'_`i''" _column(25) ///
 					as title "`variable_`i''" _column(40) as title "`value_`i''" _column(55) as title "`new_value_`i''"
-			
 			}
-			
-			noi di
-
 		}
+		noi di
 		
 		/***********************************************************************
 		Save a copy of the data ready for hfc checks
