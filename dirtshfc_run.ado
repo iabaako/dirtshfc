@@ -1,47 +1,65 @@
-*! version 0.0.0 Ishmail Azindoo Baako (IPA) Jan, 2016
+*! version 0.0.3 Ishmail Azindoo Baako (IPA) Jan, 2016
 
 /* 
 	This stata program is part of the HFC for the DIRTS Annual Survey 2017. 
 	
-	This will run all neccesary checks to the DIRTS HFC file and prep it for the dirtshfc_run.ado
-*/ 
+	This will run Checks on data that is saved from dirtshfc_prep.ado
 
-/* Define sytax for program. 
-*/
+	Define sytax for program. 
+	varname		: ID variable for survey
+	date 		: Date of interest for HFC
+	dispvars	: Variables to display at hh level excluding the hhid
+	using		: .dta file saved from dirtshfc_correct
+	enumvars	: Enumerator variables. The enumerator id and then enumerator name
+					variables are espected here. eg. enumv(enum_id enum_name)
+	logfolder	: Name of folder were logfiles are saved
+	saving		: Name for saving data after hfc is run
 
-	program define dirtshfc_run
+*/	
+	prog def dirtshfc_run
 	
-		syntax,
-		DIRECTory(string)
-		DATAset(string)
+		syntax varname using/,
+		DATE(string)
+		DISPVars(varlist)
+		ENUMVars(varlist min=2 max=2)
 		LOGFolder(string)
-		HFCDate(string)
-		MISSFile(string)
+		SAVing(string)
 
 	qui {	
 		
 		/***********************************************************************
 		Set the stage
 		***********************************************************************/
-		// Save the name of the present working directory
-		loc hfcpwd = c(pwd)
-		
-		// Check that the directory specified as is encrypted with Boxcryptor
+		* Check that the directory specified as is encrypted with Boxcryptor
 		loc pathx = substr("`directory'", 1, 1)
-		if `pathx' != "X" {
-			noi di as err "dirtshfc_run: Hello!! Folder specified with directory must be BOXCRYPTED"
+		if `pathx' != "X" & `pathx' != "." {
+			noi di as err "dirtshfc_run: Hello!! Using Data must be in a BOXCRYPTED folder"
 			exit 601
 		}
 		
+		* Get the enumerator related vars from arg enumvars
+		token `enumvars'
+		loc enum_id "`1'"				// Enumerator ID
+		loc enum_name "`2'"				// Enumerator Name
+		
+		* Make the local date an upper to avoid differnces in cases
+		loc date = upper(`date')
+		
+		* Represent the id var with the local id
+		loc id `varlist'
+
 		/**********************************************************************
 		Import team details sheet and get the names of the teams
 		***********************************************************************/			
-		import excel using "`enumdetails'", sh(enum_details) case(l) first clear
+		* Import data
+		import exc using "`enumdetails'", sh(enum_details) case(l) first clear
 		destring *_id, replace
 		
+		* Get the team ids
 		levelsof team_id, loc (team_ids) clean
 		loc team_cnt: word count `team_ids'
 		
+		* Loop through the team ids and for each id get the name and save it a local
 		foreach t in `team_ids' {
 			levelsof team_name if team_id == `t', loc(team_`t') clean			
 		}
@@ -49,107 +67,105 @@
 		/**********************************************************************
 		Import constraint values
 		***********************************************************************/			
-		import excel using "`constraint'", sh(enum_details) case(l) first clear
+		* Import sheets containing constraint values
+		import exc using "`constraint'", sh(enum_details) case(l) first clear
 		
 		count if !mi(variable)
 		loc v_cnt `r(N)'
 		
+		* Loop through each variable and get the name 
 		forval i = 1/`v_cnt' {
 			loc v_name = variable[`i']
+			unab v_name: `v_name'
 			
-			loc s_ch = substr("`v_name'", -1, .)
-			if "`s_ch'" == "*" {
+			* Check that a wild card was used and loop through each var in local
+			* and save the values in locals
+			loc v_name_cnt: word count `v_name'
+			if `v_name_cnt' > 1 {
 				foreach var of varlist `v_name' {
 					loc `var'_hmin = hard_min[`i']
 					loc `var'_smin = soft_min[`i']
 					loc `var'_smax = soft_max[`i']
 					loc `var'_hmax = hard_max[`i']
-					loc `var'_lab = var_label[`i']
 				}
 			}
 			
+			* get the soft and hard contraint values and save them in a local
 			else {
 				loc `v_name'_hmin = hard_min[`i']
 				loc `v_name'_smin = soft_min[`i']
 				loc `v_name'_smax = soft_max[`i']
 				loc `v_name'_hmax = hard_max[`i']
-				loc `v_name'_lab = var_label[`i']
 			}
 		}
 		
+		* Get the constrained vars and save the names in a local v_names
 		levelsof variable if !mi(variable), loc (v_names) clean
+		unab v_names: `v_names'
 		
 		/**********************************************************************
 		Import the SCTO generated dataset. This dataset is what is created 
-		after dirtshfc_correct.ado is runned
+		after dirtshfc_correct.ado is runs
 		***********************************************************************/	
-	
-	
-		// Confirm that string specified with directory is an actual directory
-		cap confirm file "`directory'/nul"
+		cap confirm file "`using'"
 		if !_rc {
-			
-			// Change working directory to the data directory if directory exist
-			cd "`directory'"
-		
-			cap confirm file "`dataset'"
-			if !_rc {
-				use "`dataset'", clear
+			use "`using'", clear
 				
-				// Genarate a dummy var for date of hfc
-				gen hfc = datestr == "`hfcdate'"
-			}
-			
-			// Throw an error if file does not exist
-			else {
-			
-				noi di as err "dirtshfc_run: File `dataset' not found in `directory'"
-				exit 601
-			}
+			*Genarate a dummy var for date of hfc
+			gen hfc = datestr == "`date'"
 		}
-		
-		// If directory does not exist
-		else {
 			
-			noi di as err "`directory' does not found"
+		* Throw an error if file does not exist
+		else {	
+			noi di as err "dirtshfc_run: File `dataset' not found"
 			exit 601
 		}
-		
-		
-		// Check if log folder exist, else creat it
-		
-		cap confirm file "`logfolder'/`hfcdate'/nul"
+				
+		* Check if log folder exist, else create it
+		cap confirm file "`logfolder'/`date'/nul"
 		if _rc == 601 {
-			mkdir "`logfolder'/`hfcdate'"
+			mkdir "`logfolder'/`date'"
 		}
-		
 		
 		/***********************************************************************
 		HIGH FREQUENCY CHECKS
 		
-		A log sheet will be produced for each team and another log sheet will be
-		produced for all teams.
+		Run High Frequency Checks and produce 2 log sheets
+			1. Team Logs: A log file for each team with information about team
+				members only
+			2. Master Log: A master log containing information for all field staff
 		***********************************************************************/
-		
+		loc t1 0
+		* Loop through each team and produce log sheets (Team 0 includes all enums)
 		forval i in 0 `team_ids' {
-			
-			// Load dataset 
-			use "`dataset'", clear
+			loc ++t1
+			* For the 1st iteration, import data and set team to 0
 			if `i' == 0 {
+				use "`using'", clear
 				loc team_name "All"
-				gen team_id_keep == team_id
+				gen team_id_keep = team_id
 				replace team_id == 0
+				
+				* tag all duplicates on id var
+				duplicates tag `id', gen(dup)
+			}
+			
+			* 
+			else if `i' == `2' {
+				replace team_id = team_id_keep
+				drop team_id_keep
+				loc team_name "`team_`t''"
 			}
 			
 			else {
 				loc team_name "`team_`t''"
 			}
 						
-			// start log
+			* start log
 			cap log
-			log using "`logfolder'/`hfcdate'/dirtshfc_log_TEAM_`team_name'"
+			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'"
 			
-			// Create Header
+			* Create Header
 			noi di "{hline 82}"
 			noi di _dup(82) "-"
 			noi di _dup(82) "*"
@@ -157,7 +173,8 @@
 			noi di "{bf: HIGH FREQUENCY CHECKS FOR DIRTS ANNUAL SURVEY 2017}"
 			noi di _column(10) "{bf:HFC LOG: TEAM `team_name'}" 
 			noi di
-			noi di "{bf: Date: `c(current_date)'}"
+			noi di "{bf: HFC Date		: `date'}"
+			noi di "{bf: Running Date	: `c(current_date)'}"
 	
 			noi di _dup(82) "*"
 			noi di _dup(82) "-"
@@ -168,125 +185,117 @@
 			HFC CHECK #1: SUBMISSION DETAILS AND CONSENT RATES
 			*******************************************************************/
 			
-			// Create headers for check
+			* Create headers for check
 			check_headers, checknu(1) checkna("SUBMISSIONS PER ENUMERATOR")
 			noi di  
-			noi di as title "enum_id" _column(10) as title "enum_name" _column(20) ///
+			
+			* Create column titles for submission details
+			noi di as title "`enum_id'" _column(10) as title "`enum_name'" _column(20) ///
 				as title "hfcdate" _column(30) as title "all_sub" _column(38) as title "consent_rate" 
 			
-			levelsof enum_id if team_id == `i', loc (enum_itc) clean
+			* Display submission details and consent rates for each field staff
+			levelsof `enum_id' if team_id == `i', loc (enum_itc) clean
 			foreach enum in `enum_itc' {
 				levelsof enum_name if enum_id == `enum', loc(name) clean
 				
-				count if enum_id == `enum' & hfc
+				count if `enum_id' == `enum' & hfc
 				loc day_sub `r(N)'
 				
-				count if enum_id == `enum'
+				count if `enum_id' == `enum'
 				loc all_sub `r(N)'
 				
-				count if enum_id == `enum' & consent == 1
+				count if `enum_id' == `enum' & consent == 1
 				loc consent_rate `r(N)'
 				
 				noi di "`enum'" _column(10) "`name'" _column(20) "`day_sub'" _column(30) ///
 					"`all_sub'" _column(38) "`consent_rate'"
 			}
 			
+			* drop unneeded macros
+			macro drop _enum _name _day_sub _all_sub _consent_rate
 			
 			/*******************************************************************
 			HFC CHECK #2: DUPLICATES
 			*******************************************************************/
-
-			check_headers, checknu(2) checkna("DUPLICATES ON HHID AND RESPONDENT TYPE")
+			* Create check header
+			check_headers, checknu(2) checkna("DUPLICATES ON `id'")
 			noi di  
 			
-			cap isid hhid resp_type
-			if !_rc {
+			* Check that there are duplicates with this team
+			count if dup & team_id == `i'
+			if `r(N)' == 0 {
 				noi di "Congratulations, Your Team has no duplicates on hhid and resp_type"
 			}
 			
-			else {
-				duplicates tag hhid resp_type, gen (dups)
-				count if dups & team_id == `i'
-				if `r(N)' > 0 {
-					noi di in red "There are `r(N)' duplicates on hhid and resp_type, details are as follows"
-				
-					sort hhid resp_type
-					noi di as title "s_key" _column(13) as title "enum_id" _column(18) as title "enum_name" _column(30) ///
-					as title "hhid" _column(38) as title "resp_type" _column(35) as title "resp_name" _column(50) "date_of_interview"
-				
-					levelsof key if dups & team_id == `i', loc (keys) clean
-					foreach k in `s_keys' {
-						levelsof s_key if key == `k', loc (s_key) clean
-						levelsof enum_id if key == `k', loc (enum_id) clean
-						levelsof enum_name if key == `k', loc (enum_name) clean
-						levelsof hhid if key == `k', loc (hhid) clean
-						levelsof resp_type if key == `k', loc (resp_type) clean
-						levelsof resp_name if key == `k', loc (resp_name) clean
-						levelsof startdate_str if key == `k', loc (date_of_interview) clean
-					
-						noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
-						"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`date_of_interview'"	
-					}
-				}
-				
-				else {
-					noi di "Congratulations, Your Team has no duplicates on hhid and resp_type"
-				}
+			* List observations that are duplicate on on idvar
+			else {		
+				noi di in red "There are `r(N)' duplicates on `id', details are as follows"
+				sort `id' `dispvars'
+				noi l skey `id' `dispvars' if dup & team_id == `i', noo sepby(`id')	
 			}
 			
 			/*******************************************************************
 			HFC CHECK #3: AUDIO CONSENT RATE
 			*******************************************************************/
-			
-			check_headers, checknu(3) checkna("AUDIO CONSENT RATE")
+			* Creat Check Header 
+			check_headers, checknu(3) checkna("AUDIO CONSENT RATE (% of Consented Surveys Only)")
 			noi di  
 			
-			noi di "Audio consent rates for your team are as follows:"
-			noi di as title "enum_id" _column(8) as title "enum_name" _column(30) ///
-			as title "ac_rate" _column(34) as title "all_sub" 
+			* Create display column titles
+			noi di "Audio consent rates (% of Consented Surveys Only) for your team are as follows:"
+			noi di as title "`enum_id'" _column(8) as title "`enum_name'" _column(30) ///
+			as title "ac_rate" _column(34) as title "tot_cons_surveys" 
 			
+			* For each enumerator, display audip consent rate and total consented surveys
 			foreach enum of `enum_itc' {
 				
-				levelsof enum_name if enum_id == `enum', loc (name) clean
+				levelsof `enum_name' if `enum_id' == `enum', loc (name) clean
 				
-				count if enum_id == `enum'
+				count if `enum_id' == `enum' & consent == 1
 				loc all_sub `r(N)'
 				
-				count if audio_consent == 1 & enum_id == `enum' 
+				count if audio_consent == 1 & `enum_id' == `enum' and consent == 1 
 				loc ac_rate = round(`all_sub'/`r(N)', 2)
 			
-				noi di "`enum_id'" _column(8) "`enum_name'" _column(30) "`ac_rate'%" _column(34) "`all_sub'" 
+				noi di "`enum'" _column(8) "`name'" _column(30) "`ac_rate'%" _column(34) "`all_sub'" 
 			}
+			
+			* Drop unneeded macros
+			macro drop _enum _name _ac_rate _all_sub
 			
 			/*******************************************************************
 			HFC CHECK #4: FORM VERSIONS
 			*******************************************************************/
+			* Create check headers
 			check_headers, checknu(4) checkna("FORM VERSIONS")
 			noi di  
 			
+			* Get the latest form version used on submission date of interest
 			su formdef_version if hfc
 			loc form_vers `r(max)'
 			
+			* Check that all members are using the right form and display congrats
 			cap assert formdef_version == `form_vers' if team_id == `i' & hfc
 			if !_rc {
-				noi di "Congratulations, all team members are using the latest form version for `hfcdate'" 
-				noi di "Form Version for `hfcdate': " as result "`form_vers'"
+				noi di "Congratulations, all team members are using the latest form version for `date'" 
+				noi di "Form Version for `date': " as res "`form_vers'"
 			}
 			
+			* Display form version details if enum is using the wrong for
 			else {
+				* Display message and column titles
+				noi di in red "Some members of your team may have used the wrong form version for `date'" 
+				noi di in red "Form Version for `date': " as res `form_vers'	
 				
-				noi di in red "Some members of your team may be using the wrong form version for `hfcdate'" 
-				noi di in red "Form Version for `hfcdate': " as result "`form_vers'"	
-				
-				noi di as title "enum_id" _column(8) as title "enum_name" _column(30) as title "form_version"
+				noi di as title "`enum_id'" _column(8) as title "`enum_name'" _column(30) as title "form_version"
 
-				
-				levelsof enum_id if formdef_version != `form_vers' & team_id == `i' & hfc, loc (enum_rfv) clean
+				* For each enumerator in team with wrong form version, display the id, name and form version used
+				levelsof `enum_id' if formdef_version != `form_vers' & team_id == `i' & hfc, loc (enum_rfv) clean
 				foreach enum in `enum_rfv' {
-					levelsof enum_name if enum_id == `enum', loc (enum_name) clean
-					levelsof formdef_version if enum_id == `enum' & formdef_version != `form_version', loc (form_version) clean
+					levelsof `enum_name' if `enum_id' == `enum', loc (name) clean
+					levelsof formdef_version if `enum_id' == `enum' & formdef_version != `form_version', loc (form_version) clean
 					
-					noi di "`enum_id'" _column(8) "`enum_name'" _column(30) "`form_version'"
+					noi di "`enum'" _column(8) "`name'" _column(30) "`form_version'"
 				}
 			}	
 			
@@ -549,7 +558,6 @@
 						}
 					}
 				}
-				
 			}
 		
 		}
