@@ -23,7 +23,8 @@
 		ENUMDetails(string)				///
 		SAVing(string)					///
 		[BCData(string)]				///
-		[BCSave(string)]
+		[BCSave(string)]				///
+		[ROne RTwo]
 
 	qui {	
 		
@@ -32,7 +33,7 @@
 		***********************************************************************/
 		* Check that the directory specified as is encrypted with Boxcryptor
 		loc pathx = substr("`using'", 1, 1)
-		if `pathx' != "X" {
+		if `pathx' != "X" & `pathx' != "." {
 			noi di as err "dirtshfc_prep: Hello!! Using Data must be in a BOXCRYPTED folder"
 			exit 601
 		}
@@ -46,7 +47,7 @@
 		***********************************************************************/
 		tempfile enum_data 
 		
-		import excel using "`enumdetails'", sh(enum_details) case(l) first clear
+		import exc using "`enumdetails'", sh(enum_details) case(l) first clear
 		destring *_id, replace
 		ren (enum_id enum_name) (`enum_id' `enum_name')
 		drop if mi(`enum_id')
@@ -57,7 +58,7 @@
 			sort `enum_id'
 			noi di in red "dirtshfc_prep: Variable `enum_id' is not UNIQUE"
 			noi di
-			noi list `enum_id' `enum_name' if dups, sepby(`enum_id')
+			noi l `enum_id' `enum_name' if dup, noo sepby(`enum_id')
 			noi di
 			noi di as err "{p} Please ensure that all Field Staff have one Unique _ID, " ///
 				"if you added a new Field Staff assign a new ID to that field staff." ///
@@ -110,14 +111,14 @@
 			* Stop running if key is not unique
 			else {
 				noi di as err "dirtshfc_prep: FATAL ERROR!! Variable KEY does not UNIQUELY identify the observations"
-				noi di as err "Contact Ishmail or Vinney Immediately"
+				noi di as err "Contact Ishmail or Vinny Immediately"
 				exit 459
 			}
 		}
 		
 		else {
 			noi di as err "dirtshfc_prep: FATAL ERROR!! variable KEY is MISSING from dataset"
-			noi di as err "Contact Ishmail or Vinney Immediately"
+			noi di as err "Contact Ishmail or Vinny Immediately"
 			exit 111
 		}
 		
@@ -152,7 +153,7 @@
 		merge m:1 `enum_id' using "`enum_data'", nogen
 		
 		* Drop the enum_data from memory
-		macro drop `enum_data'
+		macro drop _enum_data
 		
 		/***********************************************************************
 		Format date and time variables and create a string date var in the format
@@ -195,14 +196,21 @@
 		of the respondent has already been taken. 
 		***********************************************************************/
 
-	
+		
+		
+		/***********************************************************************
+		Recode some numeric answers as extended missing values. 
+			1. ... as .m		// Missing Values
+			2. ... as .r		// Refuse to Answer
+			3. ... as .o		// Other specify
+		***********************************************************************/
+
 	
 		/***********************************************************************
 		Save data
 		***********************************************************************/
 		
 		save `saving', replace
-		
 		
 		/***********************************************************************
 		Prepare backcheck data for analysis
