@@ -8,21 +8,25 @@
 	Define sytax for program. 
 	varname		: ID variable for survey
 	date 		: Date of interest for HFC
-	dispvars	: Variables to display at hh level excluding the hhid
+	ssdate		: Survey start date in format "DD_MM_YY"
+	sedate		: Survey enddate in format "DD_MM_YY"
 	using		: .dta file saved from dirtshfc_correct
 	enumvars	: Enumerator variables. The enumerator id and then enumerator name
 					variables are espected here. eg. enumv(enum_id enum_name)
+	dispvars	: Variables to display at hh level excluding the hhid
 	logfolder	: Name of folder were logfiles are saved
 	saving		: Name for saving data after hfc is run
 
 */	
 	prog def dirtshfc_run
 	
-		syntax varname using/,
-		DATE(string)
-		DISPVars(varlist)
-		ENUMVars(varlist min=2 max=2)
-		LOGFolder(string)
+		syntax varname using/, 			///
+		DATE(string)					///
+		SSDate(string)					///
+		SEDate(string)					///
+		ENUMVars(varlist min=2 max=2)	///
+		DISPVars(varlist)				///
+		LOGFolder(string)				///
 		SAVing(string)
 
 	qui {	
@@ -138,7 +142,7 @@
 		loc t1 0
 		* Loop through each team and produce log sheets (Team 0 includes all enums)
 		forval i in 0 `team_ids' {
-			loc ++t1
+			loc ++l
 			* For the 1st iteration, import data and set team to 0
 			if `i' == 0 {
 				use "`using'", clear
@@ -151,7 +155,7 @@
 			}
 			
 			* 
-			else if `i' == `2' {
+			else if `t1' == `2' {
 				replace team_id = team_id_keep
 				drop team_id_keep
 				loc team_name "`team_`t''"
@@ -231,7 +235,7 @@
 			else {		
 				noi di in red "There are `r(N)' duplicates on `id', details are as follows"
 				sort `id' `dispvars'
-				noi l skey `id' `dispvars' if dup & team_id == `i', noo sepby(`id')	
+				novarabbrev noi l skey `enumvars' `id' `dispvars' if dup & team_id == `i', noo sepby(`id')	
 			}
 			
 			/*******************************************************************
@@ -293,7 +297,7 @@
 				levelsof `enum_id' if formdef_version != `form_vers' & team_id == `i' & hfc, loc (enum_rfv) clean
 				foreach enum in `enum_rfv' {
 					levelsof `enum_name' if `enum_id' == `enum', loc (name) clean
-					levelsof formdef_version if `enum_id' == `enum' & formdef_version != `form_version', loc (form_version) clean
+					levelsof formdef_version if `enum_id' == `enum' & formdef_version != `form_version' & hfc, loc (form_version) clean
 					
 					noi di "`enum'" _column(8) "`name'" _column(30) "`form_version'"
 				}
@@ -303,95 +307,71 @@
 			HFC CHECK #5: CHECK SURVEY DATES
 			Check that survey dates fall with reasonable minimum and maximum dates
 			*******************************************************************/
+			* Create check headers
 			check_headers, checknu(5) checkna("DATES")
 			noi di  
 			
-			gen start_date = dofc(starttime)
-			gen end_date = dofc(endtime)
+			* Check that the neccesary vars do not already exist and create them if not
+			cap confirm var start_date end_date valid_date
+			if _rc == 111 {
+				* Generate numeric date vars
+				gen start_date = dofc(starttime)
+				gen end_date = dofc(endtime)
 			
-			loc survey_start 42795
-			loc survey_end 42839
+				* Convert ssdate and sedate to numeric dates
+				loc survey_start = subinstr("`ssdate'", "_", "", .)
+				loc survey_start = date("`ssdate'", "DM20Y")
+				loc survey_end = subinstr("`sedate'", "_", "", .)
+				loc survey_end = date("`sedate'", "DM20Y")
 			
-			loc start_date_str "01_03_17" 
-			loc end_date_str "14_04_17"
-			
-			gen valid_date = start_date < `survey_start' | end_date > `survey_end'
-			count if valid_date & team_id == `i'
-			
-			if `r(N)' == 0 {
-				noi di "Congratulations, start and end dates for all surveys are with the expected range"
+				* Generate a dummy var = 1 if date for observation is valid
+				gen valid_date = start_date >= `survey_start' | end_date <= `survey_end'
 			}
 			
+			* Count the number of obs in team with invalid dates. Display messages
+			count if !valid_date & team_id == `i'
+			if `r(N)' == 0 {
+				noi di "{p} Congratulations, start and end dates for all surveys " ///
+						"are with the expected range of `ssdate' and `sedate' {smcl}"
+			}
+			
+			* List observations with invalid dates
 			else {
-				noi di in red "Some interview dates are outside the expected range `start_date_str' and `end_date_str', details: "
-				noi di as title "s_key" _column(13) as title "enum_id" _column(18) as title "enum_name" _column(30) ///
-					as title "hhid" _column(38) as title "resp_type" _column(35) as title "resp_name" _column(50) as title "start_date" ///
-					_column(56) as title "end_date"
-				
-				levelsof key if !valid_date & team_id == `i', loc (keys) clean
-				foreach k in `keys' {
-					levelsof s_key if key == "`k'", loc (s_key) clean
-					levelsof enum_id if key == "`k'", loc (enum_id) clean
-					levelsof enum_name if key == "`k'", loc (enum_name) clean
-					levelsof hhid if key == "`k'", loc (hhid) clean
-					levelsof resp_type if key == "`k'", loc (resp_type) clean
-					levelsof resp_name if key == "`k'", loc (resp_name) clean
-					levelsof startdate_str if key == "`k'", loc (start_date) clean
-					levelsof enddate_str if key == "`k'", loc (end_date) clean
-					
-					noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
-						"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`start_date'" ///
-						_column(56) "`end_date'"
-					
+				noi di in red "Some interview dates are outside the expected range `ssdate' and `sedate', details: "
+				sort `enum_id'
+				novarabbrev noi l skey `enumvars' `id' `dispvars' if !valid_date & team_id == `i', noo sepby(`enum_id')	
 				}
 			}
-			
-			drop valid_date
-			
+						
 			/*******************************************************************
 			HFC CHECK #6: DURATION OF SURVEY
 			*******************************************************************/
 			check_headers, checknu(6) checkna("DURATION OF SURVEY")
 			noi di  
 			
-			su dur_min
-			loc dur_mean `r(mean)'
-			loc valid_dur = `dur_mean' - 60
-			gen invalid_dur = dur_min < `valid_dur'
-			
-			count if invalid_dur & hfc & team_id == `i'
-			if `r(N)' == 0 {
-				noi di "Congratulations, all members of your team administered the survey within an acceptable duration"
-				noi di "Average time per survey is: `dur_mean'"
-			
+			* Check that var valid_dur exist. If no creat var
+			cap confirm var valid_dur 
+			if _rc == 111 {
+				su duration
+				loc dur_mean `r(mean)'
+				loc valid_dur = `dur_mean' - 60
+				gen valid_duration = dur_min >= `valid_dur'
 			}
 			
-			else {
-				noi di in red "Durations for the following surveys are too short, average time per survey is `dur_mean'"
-				
-				noi di "s_key" _column(13) "enum_id" _column(18) "enum_name" _column(30) ///
-				"hhid" _column(38) "resp_type" _column(35) "resp_name" _column(50) "duration" ///
-					_column(56) "start_date"
-
-				levelsof key if invalid_dur & hfc & team_id == `i', loc (keys) clean
-				foreach k in `keys' {
-					levelsof s_key if key == "`k'", loc (s_key) clean
-					levelsof enum_id if key == "`k'", loc (enum_id) clean
-					levelsof enum_name if key == "`k'", loc (enum_name) clean
-					levelsof hhid if key == "`k'", loc (hhid) clean
-					levelsof resp_type if key == "`k'", loc (resp_type) clean
-					levelsof resp_name if key == "`k'", loc (resp_name) clean
-					levelsof dur_min if key == "`k'", loc (dur_min) clean
-					levelsof startdate_str if key == "`k'", loc (start_date) clean
-					
-					noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
-						"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`dur_min'" ///
-						_column(56) "`start_date'"
-				}
-				
-			}	
+			* Count the number of obs in team with invalid duration and display congrats
+			count if !valid_duration & hfc & team_id == `i'
+			if `r(N)' == 0 {
+				noi di "{p} Congratulations, all members of your team administered " ///
+						"their surveys within an acceptable duration. "				///
+						"Average time per survey is: `dur_mean' {smcl}"
+			}
 			
-			drop invalid_dur
+			* List surveys with suspicious durations
+			else {
+				sort `enum_id'
+				noi di in red "Durations for the following surveys are too short, average time per survey is `dur_mean'"
+				novarabbrev noi l skey `enumvars' `id' `dispvars' if !valid_dur & team_id == `i', noo sepby(`enum_id')					
+			}	
 			
 			/*******************************************************************
 			HFC CHECK #7: SOFT CONSTRAINT VIOLATIONS
@@ -399,41 +379,31 @@
 			check_headers, checknu(7) checkna("SOFT CONSTRAINT")
 			noi di  
 			
+			* In the firsts iteration, gen flag var for each constraint var
+			if `i' == 0 {
+				foreach var of varlist `v_names' {
+					su `var'
+					loc `var'_mean `r(mean)'
+					gen `var'_sf = (`var' < ``var'_smin' | `var' > ``var'_smax')
+				}
+			}
+			
+			* Check if any memeber in the team violated constraint and display message
 			foreach var of varlist `v_names' {
-				su `var'
-				loc `var'_mean `r(mean)'
-				gen flag = (`var' < ``var'_smin' | `var' > ``var'_smax') & team_id == `i'
-				count if flag
-				if `r(N)' == 0 {
-					noi di "Congratulations, your team has no soft constraint violations"
-				}
+				count if `var'_sf & team == `i'
+				loc `var'_label: var label `var'
 				
-				else {
+				* List obs that violate soft constraints. Dont display congrats
+				if  `r(N)' > 0 {
 					noi di in red "The following are soft constraint violations on variable `var'"
-					noi di "{p} Variable Description: ``var'_label' {smcl}"
-					noi di "Expected Range: " _column(18) "``var'_smin' - ``var'_smax'"
-					noi di "Average Value: " _column(18) "``var'_mean'"
-					noi di
+					noi di "Variable Description: " _column(18) "{p} ``var'_label' {smcl}"
+					noi di "Expected Range	: " _column(18) "``var'_smin' - ``var'_smax'"
+					noi di "Average Value	: " _column(18) "``var'_mean'"					
 					
-					noi di "s_key" _column(13) "enum_id" _column(18) "enum_name" _column(30) ///
-					"hhid" _column(38) "resp_type" _column(35) "resp_name" _column(50) "value"
-					
-					levelsof key if flag, loc (keys) clean
-					foreach k in `keys' {
-						levelsof s_key if key == "`k'", loc (s_key) clean
-						levelsof enum_id if key == "`k'", loc (enum_id) clean
-						levelsof enum_name if key == "`k'", loc (enum_name) clean
-						levelsof hhid if key == "`k'", loc (hhid) clean
-						levelsof resp_type if key == "`k'", loc (resp_type) clean
-						levelsof resp_name if key == "`k'", loc (resp_name) clean
-						levelsof `var' if key == "`k'", loc (value) clean
-					
-						noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
-							"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`value'"
-					}				
+					* List variables if there is a constraint violation
+					sort `enum_id'
+					novarabbrev noi l skey `enumvars' `id' `dispvars' `var' if !`var'_sf & team_id == `i', noo sepby(`enum_id')					
 				}
-				
-				drop flag
 			}			
 			
 			if `i' == 0 {
@@ -447,42 +417,30 @@
 				check_headers, checknu(8) checkna("HARD CONSTRAINT")
 				noi di  
 			
-				foreach var of varlist `v_names' {
-					su `var'
-					loc `var'_mean `r(mean)'
-					gen flag = `var' < ``var'_hmin' | `var' > ``var'_hmax'
-					count if flag
-					
-					if `r(N)' == 0 {
-						noi di "Congratilations, there are no hard constraint violations"
+				* In the firsts iteration, gen flag var for each constraint var
+				if `i' == 0 {
+					foreach var of varlist `v_names' {
+						su `var'
+						loc `var'_mean `r(mean)'
+						gen `var'_hf = (`var' < ``var'_hmin' | `var' > ``var'_hmax')
 					}
+				}
+				
+				* Check if any members in the team violated constraint and display message
+				count if `var'_hf & team == `i'
+				loc `var'_label: var label `var'
+				
+				* List obs that violate hard constraints. Dont display congrats
+				if  `r(N)' > 0 {
+					noi di in red "The following are hard constraint violations on variable `var'"
+					noi di "Variable Description: " _column(18) "{p} ``var'_label' {smcl}"
+					noi di "Expected Range	: " _column(18) "``var'_hmin' - ``var'_hmax'"
+					noi di "Average Value	: " _column(18) "``var'_mean'"					
 					
-					else {
-						noi di in red "The following are hard constraint violations on variable `var'. Please check Survey programming"
-						noi di "{p} Variable Description: ``var'_label' {smcl}"
-						noi di "Expected Range: " _column(18) "``var'_hmin' - ``var'_hmax'"
-						noi di "Average Value: " _column(18) "``var'_mean'"
-						noi di
-					
-						noi di "s_key" _column(13) "enum_id" _column(18) "enum_name" _column(30) ///
-						"hhid" _column(38) "resp_type" _column(35) "resp_name" _column(50) "value"
-					
-						levelsof key if flag, loc (keys) clean
-						foreach k in `keys' {
-							levelsof s_key if key == "`k'", loc (s_key) clean
-							levelsof enum_id if key == "`k'", loc (enum_id) clean
-							levelsof enum_name if key == "`k'", loc (enum_name) clean
-							levelsof hhid if key == "`k'", loc (hhid) clean
-							levelsof resp_type if key == "`k'", loc (resp_type) clean
-							levelsof resp_name if key == "`k'", loc (resp_name) clean
-							levelsof `var' if key == "`k'", loc (value) clean
-					
-							noi di "`s_key'" _column(13) "`enum_id'" _column(18) "`enum_name'" _column(30) ///
-								"`hhid'" _column(38) "`resp_type'" _column(35) "`resp_name'" _column(50) "`value'"
-						}				
-					}
-					drop flag
-				}			
+					* List variables if there is a constraint violation
+					sort `enum_id'
+					novarabbrev noi l skey `enumvars' `id' `dispvars' `var' if !`var'_hf & team_id == `i', noo sepby(`enum_id')					
+				}		
 
 				/***************************************************************
 				NO MISS:
@@ -491,37 +449,54 @@
 				check_headers, checknu(9) checkna("NO MISS")
 				noi di  
 
-				
+				* Save the vars to check for missing values 
 				#d;
-					loc nm_var
-							hhid
-							resp_name
-							resp_type
+					loc nm_vars
+							`id'
+							`enumvars'
+							`dispvars'
+							submissiondate
+							starttime
+							endtime
+							skey
 							;
 				#d cr
 				
-				foreach var in `nm_vars' {
-					loc nm_track 0
-					
-					cap assert !mi(`var')
-					if _rc == 9 {
-						loc ++nm_track
+				* Check the number of critical vars with missing values
+				loc nm_track 0
+				foreach var in `nmvars' {
+					cap assert !mi(`var') {
+						if _rc == 9 {
+							loc ++nm_track
+						}
 					}
-					
-					if `nm_track' == 0 {
-						noi di "Congratulations, all critical variables do not have missing values"
-					}
-					
-					else {
-						noi di "{p} `nm_track' critical variables have missing values in some observations, check survey programming. Details are listed below: {smcl}"
-						noi di as title "variable" _column(30) as title "variable_label"
-					
-						foreach var in `nm_vars' {
-							cap assert !mi(`var')
-							if _rc == 9 {
-								loc var_lab: variable label `var'
-								noi di "`var'" _column(30) "{p} `var_lab' {smcl}"
-							}					
+				}
+				
+				if `nm_track' == 0 {
+					noi di "Hurray!! all critical variables do not have missing values"
+				}
+				
+				else {
+				
+					* Displays colum headers
+					noi di "{p} Critical variables have missing values in some observations, check survey programming. Details are listed below: {smcl}"
+					noi di as title "variable" _column(20) as title "_#missing" _column(25) as title "variable_label"
+
+					foreach var in `nm_vars' {
+						* Check for missing values in var if survey has consent 
+						cap assert !mi(`var') if consent
+						if _rc == 9 {
+				
+							* Display varaibles are var labels for var with missing values
+							foreach var in `nm_vars' {
+								cap assert !mi(`var')
+								if _rc == 9 {
+									loc var_lab: var label `var'
+									count if mi(`var')
+									noi di "`var'" _column(20) as res r(N) _column(25) "{p} `var_lab' {smcl}"
+									noi di
+								}					
+							}
 						}
 					}
 				}
@@ -533,24 +508,29 @@
 				check_headers, checknu(10) checkna("ALL MISS")
 				noi di  
 				
-				foreach var in `nm_vars' {
-					loc am_track 0
-					
-					cap assert mi(`var')
-					if !_rc {
-						loc ++am_track
+				* Check that no variable has only missing alues
+				loc nm_track 0
+				foreach var of varlist _all {
+					cap assert !mi(`var') {
+						if _rc == 9 {
+							loc ++am_track
+						}
 					}
+				}
+
+				if `am_track' == 0 {
+					noi di "Congratulations, There are no variables with ALL MISSING values"
+				}
 					
-					if `am_track' == 0 {
-						noi di "Congratulations, There are no variables with all missing values"
-					}
-					
-					else {
-						noi di "{p} `am_track' variables have all missing values , check survey programming. Details are listed below: {smcl}"
-						noi di as title "variable" _column(30) as title "variable_label"
-					
-						foreach var in `nm_vars' {
-							cap assert mi(`var')
+				* Display variables with all mising values
+				else {
+					noi di "{p} `am_track' variables have all missing values, This may be " 		///
+							"caused by survey programming errors or surveys skipping this section. "///
+							"check survey programming. Details are listed below: {smcl}"
+					noi di as title "variable" _column(30) as title "variable_label"
+
+					foreach var in varlist _all {			
+						cap assert mi(`var')
 							if !_rc {
 								loc var_lab: variable label `var'
 								noi di "`var'" _column(30) "{p} `var_lab' {smcl}"
@@ -559,7 +539,6 @@
 					}
 				}
 			}
-		
 		}
 		
 		/***********************************************************************
@@ -592,12 +571,12 @@
 			cap assert string var `var' 
 			if !_rc {
 				replace `var' = "1" if mi(`var')
-				replace `var' = "0" if mi(`var')
+				replace `var' = "0" if !mi(`var')
 			}
 			
 			else {
 				replace `var' = 1 if mi(`var')
-				replace `var' = 0 if mi(`var')
+				replace `var' = 0 if !mi(`var')
 			}
 			
 			destring `var', replace
@@ -608,18 +587,15 @@
 		format %5.2 `mr_vars'
 		
 		export excel `mr_vars' using "`missfile'", first(var) sheetmod
-		
-		// return to starting directory
-		cd "`hfcpwd'"
 	}
 	
 	
 end
 
-program define check_headers
+prog def check_headers
 
-	syntax, ///
-	CHECKNUmber(numeric)
+	syntax,					 ///
+	CHECKNUmber(numeric)	///
 	CHECKNAme(string)
 	
 	noi di _dup(82) "*"
