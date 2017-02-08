@@ -15,12 +15,12 @@
 
 */
 
-	prog def dirtshfc_prep
+	prog def dirtshfc_correct
 	
-		syntax varname using/,
-		ENUMVars(varlist min=2 max=2)
-		CORRFile(string)
-		LOGfile(string)
+		syntax varname using/,			///
+		ENUMVars(varlist min=2 max=2)	///
+		CORRFile(string)				///
+		LOGfile(string)					///
 		SAVing(string)
 
 	qui {	
