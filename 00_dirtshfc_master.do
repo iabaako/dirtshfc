@@ -7,7 +7,7 @@
 #				Survey Coordinator, IPA-Ghana	
 #			  Vincent Armentano (varmentano@poverty-action.org)
 #				Research Analyst, IPA - NH			
-# Date		: January, 2017
+# Date		: February, 2017
 ********************************************************************************
 SETTING THE STAGE
 *******************************************************************************/
@@ -27,7 +27,7 @@ cap net install dirtshfc, all replace from(https://raw.githubusercontent.com/iab
 if _rc == 631 {
 	di in red "You do not have internet connectivity"
 }
-	
+stop	
 /*******************************************************************************
 RUN SCTO IMPORT DO-FILES
 *******************************************************************************/

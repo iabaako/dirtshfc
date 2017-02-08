@@ -478,7 +478,7 @@
 				
 				else {
 				
-					* Displays colum headers
+					* Displays column headers
 					noi di "{p} Critical variables have missing values in some observations, check survey programming. Details are listed below: {smcl}"
 					noi di as title "variable" _column(20) as title "_#missing" _column(25) as title "variable_label"
 
@@ -493,7 +493,7 @@
 								if _rc == 9 {
 									loc var_lab: var label `var'
 									count if mi(`var')
-									noi di "`var'" _column(20) as res r(N) _column(25) "{p} `var_lab' {smcl}"
+									noi di "`var'" _column(20) as res r(N) "{p 25 25 25 25 25} `var_lab' {smcl}"
 									noi di
 								}					
 							}
@@ -528,12 +528,12 @@
 							"caused by survey programming errors or surveys skipping this section. "///
 							"check survey programming. Details are listed below: {smcl}"
 					noi di as title "variable" _column(30) as title "variable_label"
-
+				
 					foreach var in varlist _all {			
 						cap assert mi(`var')
 							if !_rc {
 								loc var_lab: variable label `var'
-								noi di "`var'" _column(30) "{p} `var_lab' {smcl}"
+								noi di "{synopt:`var'}" "`var_lab' {p_end}"
 							}					
 						}
 					}
