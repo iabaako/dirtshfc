@@ -15,7 +15,7 @@ SETTING THE STAGE
 cls									// Clear Results
 vers 			13					// Set to Stata version 13
 set 	maxvar	20000				// Allow up to 20,000 vars
-loc		today =	c(current_date)		// Record date hfc was run
+set		more 	off					// Set more off
 loc		hfcdate	"24_Jan_17"			// Set date of interest (format: dd_mm_yy)
 
 /*******************************************************************************
