@@ -58,7 +58,7 @@
 			sort `enum_id'
 			noi di in red "dirtshfc_prep: Variable `enum_id' is not UNIQUE"
 			noi di
-			noi l `enum_id' `enum_name' if dup, noo sepby(`enum_id')
+			novarabbrev noi l `enum_id' `enum_name' if dup, noo sepby(`enum_id')
 			noi di
 			noi di as err "{p} Please ensure that all Field Staff have one Unique _ID, " ///
 				"if you added a new Field Staff assign a new ID to that field staff." ///
