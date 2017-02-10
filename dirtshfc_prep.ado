@@ -82,7 +82,7 @@
 		***********************************************************************/
 	
 		* Confirm that string specified with directory is an actual directory
-		cap confirm file "`using'"
+		cap confirm file "`using'.dta"
 			if !_rc {
 				use "`using'", clear
 			}
