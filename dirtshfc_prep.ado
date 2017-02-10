@@ -266,7 +266,8 @@ prog def datestr
 			replace `newvar'_yr = substr(`newvar'_yr,3, .)
 			
 			foreach dsv of varlist `newvar'_* {
-				replace `dsv' = 0 + `dsv' if length(`dsv') == 1
+			tostring 
+				replace `dsv' = "0" + `dsv' if length(`dsv') == 1
 			}
 			
 			generate `newvar' = day + "_" + mon + "_" + year
