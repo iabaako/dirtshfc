@@ -239,40 +239,39 @@
 				
 			}
 		}
-	}
-	
+		
 end
 
 
 prog def datestr
 
-		syntax varname, newvar(string)
+	syntax varname, newvar(string)
 		
-		qui {
-			gen dofc_temp = dofc(`varlist')
-			gen `newvar'_day = day(dofc_temp)
-			gen `newvar'_mon = month(dofc_temp)
-			gen `newvar'_yr = year(dofc_temp)
-			tostring `newvar'_*, replace
+	qui {
+		gen dofc_temp = dofc(`varlist')
+		gen `newvar'_day = day(dofc_temp)
+		gen `newvar'_mon = month(dofc_temp)
+		gen `newvar'_yr = year(dofc_temp)
+		tostring `newvar'_*, replace
 			
-			* Change the month var to a short mon in word. For instance 2 to Feb
-			loc it 1
-			foreach dt in `c(Mons)' {
-				replace `newvar'_mon = "`dt'" if `newvar'_mon == "`it'"
+		* Change the month var to a short mon in word. For instance 2 to Feb
+		loc it 1
+		foreach dt in `c(Mons)' {
+			replace `newvar'_mon = "`dt'" if `newvar'_mon == "`it'"
 				loc ++it
-			}
-
-			replace `newvar'_yr = substr(`newvar'_yr,3, .)
-			
-			foreach dsv of varlist `newvar'_* {
-				replace `dsv' = "0" + `dsv' if length(`dsv') == 1
-			}
-			
-			generate `newvar' = `newvar'_day + "_" + `newvar'_mon + "_" + `newvar'_yr
-			replace `newvar' = upper(`newvar')
-			drop `newvar'_* dofc_temp
-
 		}
+
+		replace `newvar'_yr = substr(`newvar'_yr,3, .)
+			
+		foreach dsv of varlist `newvar'_* {
+			replace `dsv' = "0" + `dsv' if length(`dsv') == 1
+		}
+			
+		generate `newvar' = `newvar'_day + "_" + `newvar'_mon + "_" + `newvar'_yr
+		replace `newvar' = upper(`newvar')
+		drop `newvar'_* dofc_temp
+
+	}
 end
 
 
