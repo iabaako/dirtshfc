@@ -65,7 +65,7 @@ program define _recurserepeats, rclass
 		
 		// find corresponding dta file
 		local dta : dir . files "*`repeat'.dta"
-		use "`dta'", clear
+		use `dta', clear
 		
 		// convert variable names to lowercase
 		foreach var of varlist _all {
