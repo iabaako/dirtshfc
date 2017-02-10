@@ -37,15 +37,9 @@
 		***********************************************************************/
 		* Check that the directory specified as is encrypted with Boxcryptor
 		loc pathx = substr("`using'", 1, 1)
-		if `pathx' != "X" & `pathx' != "." {
+		if "`pathx'" != "X" & "`pathx'" != "." {
 			noi di as err "dirtshfc_prep: Hello!! Using Data must be in a BOXCRYPTED folder"
 			exit 601
-		}
-		
-		* Check that options r1 and r2 are not specified together
-		if !mi("`rone'") & !mi("`rtwo'") {
-			noi di as error "dirtshfc_prep: Syntax Error!! You specify options rone and rtwo together"
-			exit 198
 		}
 		
 		* Check that options for for respondent survey type are specified 
