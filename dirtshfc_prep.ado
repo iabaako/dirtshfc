@@ -251,9 +251,9 @@ prog def datestr
 		
 		qui {
 			gen dofc_temp = dofc(`varlist')
-			gen `newvar'_day = day(`dofc_temp')
-			gen `newvar'_mon = month(`dofc_temp')
-			gen `newvar'_yr = year(`dofc_temp')
+			gen `newvar'_day = day(dofc_temp)
+			gen `newvar'_mon = month(dofc_temp)
+			gen `newvar'_yr = year(dofc_temp)
 			tostring `newvar'_*, replace
 			
 			* Change the month var to a short mon in word. For instance 2 to Feb
