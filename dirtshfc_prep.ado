@@ -83,15 +83,14 @@
 	
 		* Confirm that string specified with directory is an actual directory
 		cap confirm file "`using'.dta"
-			if !_rc {
-				use "`using'", clear
-			}
+		if !_rc {
+			use "`using'", clear
+		}
 			
-			* Throw and error if file does not exist
-			else {
-				noi di as err "dirtshfc_prep: File `using' not found"
-				exit 601
-			}
+		* Throw and error if file does not exist
+		else {
+			noi di as err "dirtshfc_prep: File `using' not found"
+			exit 601
 		}
 		
 		* Check that the dataset contains some data
@@ -239,6 +238,7 @@
 				
 			}
 		}
+	}
 		
 end
 
