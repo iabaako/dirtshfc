@@ -49,7 +49,7 @@
 		loc enum_name "`2'"				// Enumerator Name
 		
 		* Check that type is valid
-		loc type = lower(`type')
+		loc type = lower("`type'")
 		if "`type'" != "r1" & "`type'" != "r2" {
 			noi di as err "dirtshfc_prep: SYNTAX ERROR!! Specify r1 or r2 with type"
 			exit 601
