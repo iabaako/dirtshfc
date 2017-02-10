@@ -263,7 +263,7 @@ prog def datestr
 				loc ++it
 			}
 
-			replace `newvar'_yr = substr(yr,3, .)
+			replace `newvar'_yr = substr(`newvar'_yr,3, .)
 			
 			foreach dsv of varlist `newvar'_* {
 				replace `dsv' = 0 + `dsv' if length(`dsv') == 1
