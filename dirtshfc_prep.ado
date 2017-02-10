@@ -17,14 +17,18 @@
 */
 
 	prog def dirtshfc_prep
-	
+		
+		#d;
 		syntax using/,
-		ENUMVars(varlist min=2 max=2)	///
-		ENUMDetails(string)				///
-		SAVing(string)					///
-		[BCData(string)					///
-		BCSave(string)					///
-		ROne RTwo]
+			ENUMVars(varlist min=2 max=2)
+			ENUMDetails(string)			
+			SAVing(string)				
+			[
+			BCData(string)				
+			BCSave(string)
+			]
+		;
+		#d cr
 
 	qui {	
 		
