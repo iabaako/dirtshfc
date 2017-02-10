@@ -5,3 +5,4 @@ f dirtshfc_correct.ado
 f dirtshfc_run.ado
 f dirtshfc_err_rates.ado
 f dirtshfc_clean.ado
+f odkmergerepeats.ado
