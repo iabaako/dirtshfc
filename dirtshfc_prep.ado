@@ -22,9 +22,9 @@
 		ENUMVars(varlist min=2 max=2)	///
 		ENUMDetails(string)				///
 		SAVing(string)					///
-		[BCData(string)]				///
-		[BCSave(string)]				///
-		[ROne RTwo]
+		[BCData(string)					///
+		BCSave(string)					///
+		ROne RTwo]
 
 	qui {	
 		
