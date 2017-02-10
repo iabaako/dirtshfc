@@ -177,7 +177,7 @@
 		la var dur "Survey CTO generated duration in seconds"
 		
 		// Generate a dur_min variable
-		gen duration = floor(duration/60)
+		gen duration = floor(dur/60)
 		la var duration "Survey duration in full minutes. Estimated from variable dur"
 		
 		/***********************************************************************
