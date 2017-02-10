@@ -37,6 +37,19 @@
 			noi di as err "dirtshfc_prep: Hello!! Using Data must be in a BOXCRYPTED folder"
 			exit 601
 		}
+		
+		* Check that options r1 and r2 are not specified together
+		if !mi("`rone'") & !mi("`rtwo'") {
+			noi di as error "dirtshfc_prep: Syntax Error!! You specify options rone and rtwo together"
+			exit 198
+		}
+		
+		* Check that options for for respondent survey type are specified 
+		if mi("`rone'") & mi("`rtwo'") {
+			noi di as error "dirtshfc_prep: Syntax Error!! You must specify options rone or rtwo"
+			exit 198
+		}
+
 		* Get the enumerator related vars from arg enumvars
 		token `enumvars'
 		loc enum_id "`1'"				// Enumerator ID
@@ -199,12 +212,15 @@
 		
 		
 		/***********************************************************************
-		Recode some numeric answers as extended missing values. 
-			1. ... as .m		// Missing Values
-			2. ... as .r		// Refuse to Answer
-			3. ... as .o		// Other specify
+		Recode some numeric answers as extended missing values.
 		***********************************************************************/
-
+		* Save numeric vars in a local numeric
+		ds, has(type numeric)
+		loc numeric `r(varlist)'
+		
+		recode `numeric' (missing 	= .m)	// Missing 
+		recode `numeric' (-999 		= .d)	// Don't Know
+		recode `numeric' (-222		= .o)	// Refuse to Answer
 	
 		/***********************************************************************
 		Save data

@@ -27,7 +27,7 @@ cap net install dirtshfc, all replace from(https://raw.githubusercontent.com/iab
 if _rc == 631 {
 	di in red "You do not have internet connectivity"
 }
-stop	
+
 /*******************************************************************************
 RUN SCTO IMPORT DO-FILES
 *******************************************************************************/

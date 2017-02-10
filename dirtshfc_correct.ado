@@ -201,7 +201,7 @@
 				}
 				
 				* Load the dataset, loop through and drop the obs with matching keys and hhids
-				use "`dataset'", clear
+				use "`saving'", clear
 				forval i = 1/`hfc_drop' {
 					* Check that the entries in the correction sheets are valid
 					foreach name in "`skey_`i''" "``id'_`i''" {
@@ -251,7 +251,8 @@
 					loc value_`i' = value[`i']
 					loc new_value_`i' = new_value[`i']
 				}
-
+				
+				use "`saving'", cllear
 				
 				* Check that the entries in the correction sheets are valid
 				foreach name in "`skey_`i''" "``id'_`i''" "`variable_`i''" "`value'_`i'" "`new_value_`i''" {	
