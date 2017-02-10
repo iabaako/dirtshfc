@@ -22,7 +22,8 @@
 		syntax using/,
 			ENUMVars(varlist min=2 max=2)
 			ENUMDetails(string)			
-			SAVing(string)				
+			SAVing(string)
+			type(string)
 			[
 			BCData(string)				
 			BCSave(string)
@@ -46,6 +47,13 @@
 		token `enumvars'
 		loc enum_id "`1'"				// Enumerator ID
 		loc enum_name "`2'"				// Enumerator Name
+		
+		* Check that type is valid
+		loc type = lower(`type')
+		if "`type'" != "r1" & "`type'" != r2 {
+			noi di as err "dirtshfc_prep: SYNTAX ERROR!! Specify r1 or r2 with type"
+			exit 601
+		}
 		
 		/***********************************************************************
 		Import enumerator details and save it in a tempfile
@@ -225,18 +233,16 @@
 		** WORK ON THIS AFTER SEEING THE BACK CHECK DATA**
 		***********************************************************************/
 		
-		* Check that the bcdata option was specified and import bcdata if it was
-		if !mi("`bcdata'") {
-			cap use "`bcdata'", clear
-			if _rc == 601 {
-				noi di as err "dirtshfc_prep: Back check dataset (`bcdata') not found"
-				exit 601
-			}
+		* Check that the bcdata option was specified and import bcdata if it was		
+		cap use "`bcdata'", clear
+		if _rc == 601 {
+			noi di as err "dirtshfc_prep: Back check dataset (`bcdata') not found"
+			exit 601
+		}
 			
-			else {
-				* Write prep code for bcdata here
-				
-			}
+		else {
+			* Write prep code for bcdata here
+			
 		}
 	}
 		
