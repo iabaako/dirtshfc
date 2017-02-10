@@ -269,7 +269,7 @@ prog def datestr
 				replace `dsv' = "0" + `dsv' if length(`dsv') == 1
 			}
 			
-			generate `newvar' = day + "_" + mon + "_" + year
+			generate `newvar' = `newvar'_day + "_" + `newvar'_mon + "_" + `newvar'_year
 			replace `newvar' = upper(`newvar')
 			drop `newvar'_* dofc_temp
 
