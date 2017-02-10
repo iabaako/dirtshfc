@@ -42,12 +42,6 @@
 			exit 601
 		}
 		
-		* Check that options for for respondent survey type are specified 
-		if mi("`rone'") & mi("`rtwo'") {
-			noi di as error "dirtshfc_prep: Syntax Error!! You must specify options rone or rtwo"
-			exit 198
-		}
-
 		* Get the enumerator related vars from arg enumvars
 		token `enumvars'
 		loc enum_id "`1'"				// Enumerator ID
