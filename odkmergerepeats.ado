@@ -35,6 +35,7 @@ program define odkmergerepeats, rclass
     unab setof : setof*
 	gettoken var : setof
 	
+	set trace on
     // recurse through the repeats 
 	_recurserepeats "`var'" "`childfiles'"
 

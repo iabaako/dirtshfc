@@ -29,6 +29,7 @@
 		DISPVars(varlist)			
 		LOGFolder(string)			
 		SAVing(string)
+		type(string)
 		;
 		#d cr
 
@@ -43,6 +44,14 @@
 			noi di as err "dirtshfc_run: Hello!! Using Data must be in a BOXCRYPTED folder"
 			exit 601
 		}
+		
+		* Check that type is valid
+		loc type = lower("`type'")
+		if "`type'" != "r1" & "`type'" != "r2" {
+			noi di as err "dirtshfc_prep: SYNTAX ERROR!! Specify r1 or r2 with type"
+			exit 601
+		}
+
 		
 		* Get the enumerator related vars from arg enumvars
 		token `enumvars'
@@ -128,10 +137,11 @@
 		***********************************************************************/
 		loc t1 -1
 		* Loop through each team and produce log sheets (Team 0 includes all enums)
-		foreach i in 0 `team_ids' {
+		foreach team in 0 `team_ids' {
 			loc ++t1
 			* For the 1st iteration, import data and set team to 0
-			if `i' == 0 {
+			
+			if `team' == 0 {
 				use "`saving'", clear
 				loc team_name "All"
 				gen team_id_keep = team_id
@@ -190,7 +200,7 @@
 			
 			
 			* Display submission details and consent rates for each field staff
-			levelsof `enum_id' if team_id == `i', loc (enum_itc) clean
+			levelsof `enum_id' if team_id == `team', loc (enum_itc) clean
 			foreach enum in `enum_itc' {
 				levelsof `enum_name' if `enum_id' == `enum', loc(name) clean
 				
@@ -201,7 +211,8 @@
 				loc all_sub `r(N)'
 				
 				su respondent_agree if `enum_id' == `enum'
-				loc consent_rate: di %5.2f `r(mean)'
+				loc consent_rate = `r(mean)' * 100
+				loc consent_rate: di %5.2f `consent_rate'
 				
 				noi di "`enum'" _column(10) "`name'" _column(35) "`day_sub'" _column(47) ///
 					"`all_sub'" _column(58) "`consent_rate'%"
@@ -220,7 +231,7 @@
 			noi di  
 			
 			* Check that there are duplicates with this team
-			count if dup & team_id == `i'
+			count if dup & team_id == `team'
 			if `r(N)' == 0 {
 				noi di "Congratulations, Your Team has no duplicates on `id'"
 			}
@@ -229,7 +240,7 @@
 			else {		
 				noi di in red "There are `r(N)' duplicates on `id', details are as follows"
 				sort `id' `dispvars'
-				noi l skey `enumvars' `id' `dispvars' if dup & team_id == `i', noo sepby(`id') abbrev(32)	
+				noi l skey `enumvars' `id' `dispvars' if dup & team_id == `team', noo sepby(`id') abbrev(32)	
 			}
 			
 			/*******************************************************************
@@ -240,7 +251,7 @@
 			noi di
 			noi check_headers, checknu("3") checkna("AUDIO CONSENT RATE (% of Consented Surveys Only)")
 			noi di  
-			
+		
 			* Create display column titles
 			noi di "Audio consent rates (% of Consented Surveys Only) for your team are as follows:"
 			noi di  "`enum_id'" _column(10)  "`enum_name'" _column(35) ///
@@ -269,7 +280,7 @@
 			/*******************************************************************
 			HFC CHECK #4: FORM VERSIONS
 			*******************************************************************/
-		
+			
 			* Create check headers
 			noi di
 			noi check_headers, checknu("4") checkna("FORM VERSIONS")
@@ -280,7 +291,7 @@
 			loc form_vers `r(max)'
 			
 			* Check that all members are using the right form and display congrats
-			cap assert formdef_version == `form_vers' if team_id == `i' & hfc
+			cap assert formdef_version == `form_vers' if team_id == `team' & hfc
 			if !_rc {
 				noi di "Congratulations, all team members are using the latest form version for `date'" 
 				noi di "Form Version for `date': " as res "`form_vers'"
@@ -297,7 +308,7 @@
 				noi di  "`enum_id'" _column(10)  "`enum_name'" _column(35)  "form_version"
 
 				* For each enumerator in team with wrong form version, display the id, name and form version used
-				levelsof `enum_id' if formdef_version != `form_vers' & team_id == `i' & hfc, loc (enum_rfv) clean
+				levelsof `enum_id' if formdef_version != `form_vers' & team_id == `team' & hfc, loc (enum_rfv) clean
 				foreach enum in `enum_rfv' {
 					levelsof `enum_name' if `enum_id' == `enum', loc (name) clean
 					levelsof formdef_version if `enum_id' == `enum' & formdef_version != `form_version' & hfc, loc (form_version) clean
@@ -314,9 +325,9 @@
 			* Create check headers
 			noi di
 			noi check_headers, checknu("5") checkna("DATES")
-			noi di  
+			noi di 
 			
-			if `i' == 0 {
+			if `team' == 0 {
 				* Generate numeric date vars
 				gen start_date = dofc(starttime)
 				gen end_date = dofc(endtime)
@@ -332,20 +343,17 @@
 			}
 			
 			* Count the number of obs in team with invalid dates. Display messages
-			count if !valid_date & team_id == `i'
+			count if !valid_date & team_id == `team'
 			if `r(N)' == 0 {
-				noi di "{p} Congratulations, start and end dates for all surveys " ///
-						"are within the expected range of `ssdate' and `sedate' {smcl}"
+				noi di "{p} Congratulations, start and end dates for all surveys are within the expected range of `ssdate' and `sedate' {p_end}"
 			}
 			
 			* List observations with invalid dates
 			else {
 				noi di in red "Some interview dates are outside the expected range `ssdate' and `sedate', details: "
 				sort `enum_id'
-				noi l skey `enumvars' `id' `dispvars' if !valid_date & team_id == `i', noo sepby(`enum_id')	abbrev(32)
-				}
+				noi l skey `enumvars' `id' `dispvars' if !valid_date & team_id == `team', noo sepby(`enum_id')	abbrev(32)
 			}
-			
 
 			/*******************************************************************
 			HFC CHECK #6: DURATION OF SURVEY
@@ -354,9 +362,8 @@
 			noi check_headers, checknu("6") checkna("DURATION OF SURVEY")
 			noi di  
 			
-			set trace on
 			* Check that var valid_dur exist. If no creat var
-			if `i' == 0 {
+			if `team' == 0 {
 				su duration
 				loc dur_mean `r(mean)'
 				loc valid_dur = `dur_mean' - 60
@@ -364,7 +371,7 @@
 			}
 			
 			* Count the number of obs in team with invalid duration and display congrats
-			count if !valid_duration & hfc & team_id == `i'
+			count if !valid_duration & hfc & team_id == `team'
 			if `r(N)' == 0 {
 				noi di "{p} Congratulations, all members of your team administered " ///
 						"their surveys within an acceptable duration. "				///
@@ -375,9 +382,9 @@
 			else {
 				sort `enum_id'
 				noi di in red "Durations for the following surveys are too short, average time per survey is `dur_mean' minutes"
-				noi l skey `enumvars' `id' `dispvars' duration if !valid_dur & team_id == `i', noo sepby(`enum_id')	abbrev(32)				
+				noi l skey `enumvars' `id' `dispvars' duration if !valid_dur & team_id == `team', noo sepby(`enum_id')	abbrev(32)				
 			}	
-			
+		
 			/*******************************************************************
 			HFC CHECK #7: SOFT CONSTRAINT VIOLATIONS
 			*******************************************************************/
@@ -386,12 +393,20 @@
 			noi di  
 		
 			* In the firsts iteration, gen flag var for each constraint var
-			
+		
 			forval c = 1/`v_cnt' {
 				loc j 0
 				unab v_name: `con_`c'_var'
+				
+				* Omit names of flags from the list to use
+				if `team' != 0 {
+					ds *_sf *_hf
+					loc omit `r(varlist)'
+					loc v_name: list v_name - omit
+				}
+				
 				foreach var in `v_name' {
-					if `i' == 0 {
+					if `team' == 0 {
 						su `var'
 						loc `var'_mn `r(mean)'
 						gen `var'_sf = !mi(`var') & ((`var' < `con_`c'_sn') | (`var' > `con_`c'_sx'))
@@ -403,7 +418,7 @@
 					}
 					
 					* Check if any member in the team violated constraint and display message
-					count if `var'_sf & team_id == `i'
+					count if `var'_sf & team_id == `team'
 					if `r(N)' > 0 {
 						loc `var'_lab: var label `var'
 						noi di in red "The following are soft constraint violations on variable `var'"
@@ -412,7 +427,7 @@
 						noi di "Average Value	: " _column(18) "``var'_mn'"					
 							
 						sort `enum_id'
-						noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf & team_id == `i', noo sepby(`enum_id') abbrev(32)
+						noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf & team_id == `team', noo sepby(`enum_id') abbrev(32)
 						loc ++j
 					}
 				}
@@ -424,7 +439,7 @@
 				noi di "Congratulations, your team has no constraint violations"
 			}
 			
-			if `i' == 0 {
+			if `team' == 0 {
 			
 				/***************************************************************
 				THIS IS TO INCLUDE SOME FEW MORE CHECKS FOR PROGRAMMING ERRORS
@@ -438,23 +453,24 @@
 		
 				* In the firsts iteration, gen flag var for each constraint var
 				
-				if `i' == 0 {
-				loc j 0
-				forval c = 1/`v_cnt' {
-					foreach var in `v_name' {
+				if `team' == 0 {
+					loc j 0
+					forval c = 1/`v_cnt' {
+						foreach var in `v_name' {
 
-						* Check if any member in the team violated constraint and display message
-						count if `var'_hf & team_id == `i'
-						if `r(N)' > 0 {
-							loc `var'_lab: var label `var'
-							noi di in red "The following are soft constraint violations on variable `var'"
-							noi di "{synopt: Variable Description: }" "``var'_lab' {p_end}"
-							noi di "Expected Range	: " _column(18) "`con_`c'_hn' - `con_`c'_hx'"
-							noi di "Average Value	: " _column(18) "`var'_mn'"					
+							* Check if any member in the team violated constraint and display message
+							count if `var'_hf & team_id == `team'
+							if `r(N)' > 0 {
+								loc `var'_lab: var label `var'
+								noi di in red "The following are soft constraint violations on variable `var'"
+								noi di "{synopt: Variable Description: }" "``var'_lab' {p_end}"
+								noi di "Expected Range	: " _column(18) "`con_`c'_hn' - `con_`c'_hx'"
+								noi di "Average Value	: " _column(18) "`var'_mn'"					
 							
-							sort `enum_id'
-							noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf & team_id == `i', noo sepby(`enum_id') abbrev(32)
-							loc ++j
+								sort `enum_id'
+								noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf & team_id == `team', noo sepby(`enum_id') abbrev(32)
+								loc ++j
+							}
 						}
 					}
 				}
@@ -463,6 +479,8 @@
 				if `j' == 0 {
 					noi di "Congratulations, there are no hard constraint violations"
 				}
+				
+				macro drop _`var'_mn
 
 				/***************************************************************
 				NO MISS:
@@ -483,10 +501,6 @@
 						starttime
 						endtime
 						skey
-						audio_audit
-						plot1
-						plot2
-						plot3
 						;
 				#d cr
 				
@@ -529,7 +543,7 @@
 				/***************************************************************
 				ALL MISS. 
 				Display variables that have all missing values
-				****************************************************************
+				****************************************************************/
 				noi di
 				noi check_headers, checknu("10") checkna("ALL MISS")
 				noi di  
@@ -569,7 +583,7 @@
 			}
 		}
 		
-		// Close log
+		* Close log
 		log close
 		
 		/**********************************************************************
