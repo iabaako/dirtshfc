@@ -17,11 +17,14 @@
 
 	prog def dirtshfc_correct
 	
-		syntax varname using/,			///
-		ENUMVars(varlist min=2 max=2)	///
-		CORRFile(string)				///
-		LOGfile(string)					///
+		#d;
+		syntax varname using/,			
+		ENUMVars(varlist min=2 max=2)	
+		CORRFile(string)				
+		LOGfile(string)					
 		SAVing(string)
+		;
+		#d cr
 
 	qui {	
 		
@@ -29,8 +32,8 @@
 		Set the stage
 		***********************************************************************/
 		* Check that the data specified is in a boxcrypted folder
-		loc pathx = substr("`directory'", 1, 1)
-		if `pathx' != "X" & `pathx' != "." {
+		loc pathx = substr("`using'", 1, 1)
+		if "`pathx'" != "X" & "`pathx'" != "." {
 			noi di as err "dirtshfc_correct: Hello!! Using Data must be in a BOXCRYPTED folder"
 			exit 601
 		}
@@ -42,11 +45,25 @@
 		Import corrections file details and save it in a tempfile
 		***********************************************************************/
 		tempfile corr_data 
-		import exc using "`corrections'", sh(enum_details) case(l) first clear
+		import exc using "`corrfile'", sh(corrections) case(l) first clear
+		count if !mi(skey)
 		
 		* Check that the dataset contains some data. If not skip correctiosn
-		if (_N==0) {
+		if `r(N)' == 0 {
 			noi di in green "dirtshfc_correct: Hurray!! No need for corrections"
+			
+			* Load data into memory
+			cap confirm file "`using'"
+			if !_rc {
+				use "`using'", clear
+			}
+			
+			* Throw and error if file does not exist
+			else {
+				noi di as err "dirtshfc_correct: File `using' not found"
+				exit 601
+			}
+
 		}
 		
 		* Running correction code if corrfile has some data
@@ -92,7 +109,7 @@
 			}
 		
 			cap log close
-			log using "`logfile'", replace
+			log using "`logfile'", replace text
 			
 			
 			* Create Header
@@ -289,7 +306,7 @@
 		***********************************************************************/
 		
 		* Close log
-		log close
+		cap log close
 		
 		* Save file
 		save "`saving'", replace		

@@ -10,7 +10,6 @@
 	date 		: Date of interest for HFC
 	ssdate		: Survey start date in format "DD_MM_YY"
 	sedate		: Survey enddate in format "DD_MM_YY"
-	using		: .dta file saved from dirtshfc_correct
 	enumvars	: Enumerator variables. The enumerator id and then enumerator name
 					variables are espected here. eg. enumv(enum_id enum_name)
 	dispvars	: Variables to display at hh level excluding the hhid
@@ -19,15 +18,19 @@
 
 */	
 	prog def dirtshfc_run
-	
-		syntax varname using/, 			///
-		DATE(string)					///
-		SSDate(string)					///
-		SEDate(string)					///
-		ENUMVars(varlist min=2 max=2)	///
-		DISPVars(varlist)				///
-		LOGFolder(string)				///
+		
+		#d;
+		syntax varname using/, 
+		DATE(string)			
+		SSDate(string)			
+		SEDate(string)
+		ENUMDetails(string)
+		ENUMVars(varlist min=2 max=2)
+		DISPVars(varlist)			
+		LOGFolder(string)			
 		SAVing(string)
+		;
+		#d cr
 
 	qui {	
 		
@@ -35,8 +38,8 @@
 		Set the stage
 		***********************************************************************/
 		* Check that the directory specified as is encrypted with Boxcryptor
-		loc pathx = substr("`directory'", 1, 1)
-		if `pathx' != "X" & `pathx' != "." {
+		loc pathx = substr("`using'", 1, 1)
+		if "`pathx'" != "X" & "`pathx'" != "." {
 			noi di as err "dirtshfc_run: Hello!! Using Data must be in a BOXCRYPTED folder"
 			exit 601
 		}
@@ -47,7 +50,7 @@
 		loc enum_name "`2'"				// Enumerator Name
 		
 		* Make the local date an upper to avoid differnces in cases
-		loc date = upper(`date')
+		loc date = upper("`date'")
 		
 		* Represent the id var with the local id
 		loc id `varlist'
@@ -64,48 +67,31 @@
 		loc team_cnt: word count `team_ids'
 		
 		* Loop through the team ids and for each id get the name and save it a local
+		loc x 0
 		foreach t in `team_ids' {
-			levelsof team_name if team_id == `t', loc(team_`t') clean			
+			loc ++x
+			levelsof team_name if team_id == `t', loc(team_`x') clean			
 		}
+		
 		
 		/**********************************************************************
 		Import constraint values
 		***********************************************************************/			
 		* Import sheets containing constraint values
-		import exc using "`constraint'", sh(enum_details) case(l) first clear
+		import exc using "`enumdetails'", sh(constraints) case(l) first clear
 		
 		count if !mi(variable)
 		loc v_cnt `r(N)'
 		
-		* Loop through each variable and get the name 
+		* Loop through each variable and get the names and constraint values
 		forval i = 1/`v_cnt' {
-			loc v_name = variable[`i']
-			unab v_name: `v_name'
 			
-			* Check that a wild card was used and loop through each var in local
-			* and save the values in locals
-			loc v_name_cnt: word count `v_name'
-			if `v_name_cnt' > 1 {
-				foreach var of varlist `v_name' {
-					loc `var'_hmin = hard_min[`i']
-					loc `var'_smin = soft_min[`i']
-					loc `var'_smax = soft_max[`i']
-					loc `var'_hmax = hard_max[`i']
-				}
-			}
-			
-			* get the soft and hard contraint values and save them in a local
-			else {
-				loc `v_name'_hmin = hard_min[`i']
-				loc `v_name'_smin = soft_min[`i']
-				loc `v_name'_smax = soft_max[`i']
-				loc `v_name'_hmax = hard_max[`i']
-			}
+			loc con_`i'_var = variable[`i']
+			loc con_`i'_hn = hard_min[`i']
+			loc con_`i'_sn = soft_min[`i']
+			loc con_`i'_sx = soft_max[`i']
+			loc con_`i'_hx = hard_max[`i']
 		}
-		
-		* Get the constrained vars and save the names in a local v_names
-		levelsof variable if !mi(variable), loc (v_names) clean
-		unab v_names: `v_names'
 		
 		/**********************************************************************
 		Import the SCTO generated dataset. This dataset is what is created 
@@ -116,7 +102,8 @@
 			use "`using'", clear
 				
 			*Genarate a dummy var for date of hfc
-			gen hfc = datestr == "`date'"
+			gen hfc = subdate_str == "`date'"
+			save "`saving'", replace
 		}
 			
 		* Throw an error if file does not exist
@@ -124,7 +111,7 @@
 			noi di as err "dirtshfc_run: File `dataset' not found"
 			exit 601
 		}
-				
+		
 		* Check if log folder exist, else create it
 		cap confirm file "`logfolder'/`date'/nul"
 		if _rc == 601 {
@@ -139,50 +126,51 @@
 				members only
 			2. Master Log: A master log containing information for all field staff
 		***********************************************************************/
-		loc t1 0
+		loc t1 -1
 		* Loop through each team and produce log sheets (Team 0 includes all enums)
-		forval i in 0 `team_ids' {
-			loc ++l
+		foreach i in 0 `team_ids' {
+			loc ++t1
 			* For the 1st iteration, import data and set team to 0
 			if `i' == 0 {
-				use "`using'", clear
+				use "`saving'", clear
 				loc team_name "All"
 				gen team_id_keep = team_id
-				replace team_id == 0
+				replace team_id = 0
 				
 				* tag all duplicates on id var
 				duplicates tag `id', gen(dup)
 			}
 			
 			* 
-			else if `t1' == `2' {
+			else if `t1' == 1 {
 				replace team_id = team_id_keep
 				drop team_id_keep
-				loc team_name "`team_`t''"
+				loc team_name "`team_`t1''"
 			}
 			
 			else {
-				loc team_name "`team_`t''"
+				loc team_name "`team_`t1''"
 			}
 						
 			* start log
-			cap log
-			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'"
+			cap log close
+			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'", replace
 			
 			* Create Header
-			noi di "{hline 82}"
-			noi di _dup(82) "-"
-			noi di _dup(82) "*"
+			noi di "{hline 120}"
+			noi di _dup(120) "-"
+			noi di _dup(120) "*"
 	
 			noi di "{bf: HIGH FREQUENCY CHECKS FOR DIRTS ANNUAL SURVEY 2017}"
 			noi di _column(10) "{bf:HFC LOG: TEAM `team_name'}" 
 			noi di
 			noi di "{bf: HFC Date		: `date'}"
-			noi di "{bf: Running Date	: `c(current_date)'}"
+			loc date_f = upper(subinstr("`c(current_date)'", " ", "_", .))
+			noi di "{bf: Running Date	: `date_f'}"
 	
-			noi di _dup(82) "*"
-			noi di _dup(82) "-"
-			noi di "{hline 82}"
+			noi di _dup(120) "*"
+			noi di _dup(120) "-"
+			noi di "{hline 120}"
 			
 			
 			/*******************************************************************
@@ -190,17 +178,21 @@
 			*******************************************************************/
 			
 			* Create headers for check
-			check_headers, checknu(1) checkna("SUBMISSIONS PER ENUMERATOR")
+			noi di
+			noi check_headers, checknu("1") checkna("SUBMISSIONS PER ENUMERATOR")
 			noi di  
 			
 			* Create column titles for submission details
-			noi di as title "`enum_id'" _column(10) as title "`enum_name'" _column(20) ///
-				as title "hfcdate" _column(30) as title "all_sub" _column(38) as title "consent_rate" 
+			noi di  "`enum_id'" _column(10)  "`enum_name'" _column(35) ///
+				 "hfcdate" _column(47)  "all_sub" _column(58)  "consent_rate(%)" 
+			noi di "{hline 74}"
+			noi di
+			
 			
 			* Display submission details and consent rates for each field staff
 			levelsof `enum_id' if team_id == `i', loc (enum_itc) clean
 			foreach enum in `enum_itc' {
-				levelsof enum_name if enum_id == `enum', loc(name) clean
+				levelsof `enum_name' if `enum_id' == `enum', loc(name) clean
 				
 				count if `enum_id' == `enum' & hfc
 				loc day_sub `r(N)'
@@ -208,60 +200,67 @@
 				count if `enum_id' == `enum'
 				loc all_sub `r(N)'
 				
-				count if `enum_id' == `enum' & consent == 1
-				loc consent_rate `r(N)'
+				su respondent_agree if `enum_id' == `enum'
+				loc consent_rate: di %5.2f `r(mean)'
 				
-				noi di "`enum'" _column(10) "`name'" _column(20) "`day_sub'" _column(30) ///
-					"`all_sub'" _column(38) "`consent_rate'"
+				noi di "`enum'" _column(10) "`name'" _column(35) "`day_sub'" _column(47) ///
+					"`all_sub'" _column(58) "`consent_rate'%"
 			}
 			
 			* drop unneeded macros
-			macro drop _enum _name _day_sub _all_sub _consent_rate
+			macro drop _enum _day_sub _all_sub _consent_rate
 			
 			/*******************************************************************
 			HFC CHECK #2: DUPLICATES
 			*******************************************************************/
 			* Create check header
-			check_headers, checknu(2) checkna("DUPLICATES ON `id'")
+
+			noi di
+			noi check_headers, checknu("2") checkna("DUPLICATES ON `id'")
 			noi di  
 			
 			* Check that there are duplicates with this team
 			count if dup & team_id == `i'
 			if `r(N)' == 0 {
-				noi di "Congratulations, Your Team has no duplicates on hhid and resp_type"
+				noi di "Congratulations, Your Team has no duplicates on `id'"
 			}
 			
 			* List observations that are duplicate on on idvar
 			else {		
 				noi di in red "There are `r(N)' duplicates on `id', details are as follows"
 				sort `id' `dispvars'
-				novarabbrev noi l skey `enumvars' `id' `dispvars' if dup & team_id == `i', noo sepby(`id')	
+				noi l skey `enumvars' `id' `dispvars' if dup & team_id == `i', noo sepby(`id') abbrev(32)	
 			}
 			
 			/*******************************************************************
 			HFC CHECK #3: AUDIO CONSENT RATE
 			*******************************************************************/
-			* Creat Check Header 
-			check_headers, checknu(3) checkna("AUDIO CONSENT RATE (% of Consented Surveys Only)")
+			* Create Check Header 
+			
+			noi di
+			noi check_headers, checknu("3") checkna("AUDIO CONSENT RATE (% of Consented Surveys Only)")
 			noi di  
 			
 			* Create display column titles
 			noi di "Audio consent rates (% of Consented Surveys Only) for your team are as follows:"
-			noi di as title "`enum_id'" _column(8) as title "`enum_name'" _column(30) ///
-			as title "ac_rate" _column(34) as title "tot_cons_surveys" 
+			noi di  "`enum_id'" _column(10)  "`enum_name'" _column(35) ///
+			 "ac_rate" _column(50)  "tot_cons_surveys" 
+			noi di "{hline 60}"
+			noi di
+
 			
 			* For each enumerator, display audip consent rate and total consented surveys
-			foreach enum of `enum_itc' {
+			foreach enum in `enum_itc' {
 				
 				levelsof `enum_name' if `enum_id' == `enum', loc (name) clean
 				
-				count if `enum_id' == `enum' & consent == 1
+				count if `enum_id' == `enum' & respondent_agree == 1
 				loc all_sub `r(N)'
 				
-				count if audio_consent == 1 & `enum_id' == `enum' and consent == 1 
-				loc ac_rate = round(`all_sub'/`r(N)', 2)
+				su audio_consent if `enum_id' == `enum' & !mi(respondent_agree) 
+				loc ac_rate: di %5.2f `r(mean)'
 			
-				noi di "`enum'" _column(8) "`name'" _column(30) "`ac_rate'%" _column(34) "`all_sub'" 
+				noi di "`enum'" _column(10) "`name'" _column(35) "`ac_rate'%" _column(50) "`all_sub'" 
 			}
 			
 			* Drop unneeded macros
@@ -270,8 +269,10 @@
 			/*******************************************************************
 			HFC CHECK #4: FORM VERSIONS
 			*******************************************************************/
+		
 			* Create check headers
-			check_headers, checknu(4) checkna("FORM VERSIONS")
+			noi di
+			noi check_headers, checknu("4") checkna("FORM VERSIONS")
 			noi di  
 			
 			* Get the latest form version used on submission date of interest
@@ -285,13 +286,15 @@
 				noi di "Form Version for `date': " as res "`form_vers'"
 			}
 			
+			
 			* Display form version details if enum is using the wrong for
 			else {
 				* Display message and column titles
 				noi di in red "Some members of your team may have used the wrong form version for `date'" 
+				noi di
 				noi di in red "Form Version for `date': " as res `form_vers'	
 				
-				noi di as title "`enum_id'" _column(8) as title "`enum_name'" _column(30) as title "form_version"
+				noi di  "`enum_id'" _column(10)  "`enum_name'" _column(35)  "form_version"
 
 				* For each enumerator in team with wrong form version, display the id, name and form version used
 				levelsof `enum_id' if formdef_version != `form_vers' & team_id == `i' & hfc, loc (enum_rfv) clean
@@ -299,21 +302,21 @@
 					levelsof `enum_name' if `enum_id' == `enum', loc (name) clean
 					levelsof formdef_version if `enum_id' == `enum' & formdef_version != `form_version' & hfc, loc (form_version) clean
 					
-					noi di "`enum'" _column(8) "`name'" _column(30) "`form_version'"
+					noi di "`enum'" _column(10) "`name'" _column(35) "`form_version'"
 				}
 			}	
+			
 			
 			/*******************************************************************
 			HFC CHECK #5: CHECK SURVEY DATES
 			Check that survey dates fall with reasonable minimum and maximum dates
 			*******************************************************************/
 			* Create check headers
-			check_headers, checknu(5) checkna("DATES")
+			noi di
+			noi check_headers, checknu("5") checkna("DATES")
 			noi di  
 			
-			* Check that the neccesary vars do not already exist and create them if not
-			cap confirm var start_date end_date valid_date
-			if _rc == 111 {
+			if `i' == 0 {
 				* Generate numeric date vars
 				gen start_date = dofc(starttime)
 				gen end_date = dofc(endtime)
@@ -323,7 +326,7 @@
 				loc survey_start = date("`ssdate'", "DM20Y")
 				loc survey_end = subinstr("`sedate'", "_", "", .)
 				loc survey_end = date("`sedate'", "DM20Y")
-			
+				
 				* Generate a dummy var = 1 if date for observation is valid
 				gen valid_date = start_date >= `survey_start' | end_date <= `survey_end'
 			}
@@ -332,30 +335,32 @@
 			count if !valid_date & team_id == `i'
 			if `r(N)' == 0 {
 				noi di "{p} Congratulations, start and end dates for all surveys " ///
-						"are with the expected range of `ssdate' and `sedate' {smcl}"
+						"are within the expected range of `ssdate' and `sedate' {smcl}"
 			}
 			
 			* List observations with invalid dates
 			else {
 				noi di in red "Some interview dates are outside the expected range `ssdate' and `sedate', details: "
 				sort `enum_id'
-				novarabbrev noi l skey `enumvars' `id' `dispvars' if !valid_date & team_id == `i', noo sepby(`enum_id')	
+				noi l skey `enumvars' `id' `dispvars' if !valid_date & team_id == `i', noo sepby(`enum_id')	abbrev(32)
 				}
 			}
-						
+			
+
 			/*******************************************************************
 			HFC CHECK #6: DURATION OF SURVEY
 			*******************************************************************/
-			check_headers, checknu(6) checkna("DURATION OF SURVEY")
+			noi di
+			noi check_headers, checknu("6") checkna("DURATION OF SURVEY")
 			noi di  
 			
+			set trace on
 			* Check that var valid_dur exist. If no creat var
-			cap confirm var valid_dur 
-			if _rc == 111 {
+			if `i' == 0 {
 				su duration
 				loc dur_mean `r(mean)'
 				loc valid_dur = `dur_mean' - 60
-				gen valid_duration = dur_min >= `valid_dur'
+				gen valid_duration = duration >= `valid_dur'
 			}
 			
 			* Count the number of obs in team with invalid duration and display congrats
@@ -363,48 +368,61 @@
 			if `r(N)' == 0 {
 				noi di "{p} Congratulations, all members of your team administered " ///
 						"their surveys within an acceptable duration. "				///
-						"Average time per survey is: `dur_mean' {smcl}"
+						"Average time per survey is: `dur_mean' minutes {smcl}"
 			}
 			
 			* List surveys with suspicious durations
 			else {
 				sort `enum_id'
-				noi di in red "Durations for the following surveys are too short, average time per survey is `dur_mean'"
-				novarabbrev noi l skey `enumvars' `id' `dispvars' if !valid_dur & team_id == `i', noo sepby(`enum_id')					
+				noi di in red "Durations for the following surveys are too short, average time per survey is `dur_mean' minutes"
+				noi l skey `enumvars' `id' `dispvars' duration if !valid_dur & team_id == `i', noo sepby(`enum_id')	abbrev(32)				
 			}	
 			
 			/*******************************************************************
 			HFC CHECK #7: SOFT CONSTRAINT VIOLATIONS
 			*******************************************************************/
-			check_headers, checknu(7) checkna("SOFT CONSTRAINT")
+			noi di
+			noi check_headers, checknu("7") checkna("SOFT CONSTRAINT")
 			noi di  
-			
+		
 			* In the firsts iteration, gen flag var for each constraint var
-			if `i' == 0 {
-				foreach var of varlist `v_names' {
-					su `var'
-					loc `var'_mean `r(mean)'
-					gen `var'_sf = (`var' < ``var'_smin' | `var' > ``var'_smax')
+			
+			forval c = 1/`v_cnt' {
+				loc j 0
+				unab v_name: `con_`c'_var'
+				foreach var in `v_name' {
+					if `i' == 0 {
+						su `var'
+						loc `var'_mn `r(mean)'
+						gen `var'_sf = !mi(`var') & ((`var' < `con_`c'_sn') | (`var' > `con_`c'_sx'))
+						gen `var'_hf = !mi(`var') & ((`var' < `con_`c'_hn') | (`var' > `con_`c'_hx'))
+						
+						* Label flag variables
+						lab var `var'_sf "Flag soft constraint violation"
+						lab var `var'_hf "Flag hard constraint violation"
+					}
+					
+					* Check if any member in the team violated constraint and display message
+					count if `var'_sf & team_id == `i'
+					if `r(N)' > 0 {
+						loc `var'_lab: var label `var'
+						noi di in red "The following are soft constraint violations on variable `var'"
+						noi di "{synopt: Variable Description: }" "``var'_lab' {p_end}"
+						noi di "Expected Range	: " _column(18) "`con_`c'_sn' - `con_`c'_sx'"
+						noi di "Average Value	: " _column(18) "``var'_mn'"					
+							
+						sort `enum_id'
+						noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf & team_id == `i', noo sepby(`enum_id') abbrev(32)
+						loc ++j
+					}
 				}
 			}
 			
-			* Check if any memeber in the team violated constraint and display message
-			foreach var of varlist `v_names' {
-				count if `var'_sf & team == `i'
-				loc `var'_label: var label `var'
-				
-				* List obs that violate soft constraints. Dont display congrats
-				if  `r(N)' > 0 {
-					noi di in red "The following are soft constraint violations on variable `var'"
-					noi di "Variable Description: " _column(18) "{p} ``var'_label' {smcl}"
-					noi di "Expected Range	: " _column(18) "``var'_smin' - ``var'_smax'"
-					noi di "Average Value	: " _column(18) "``var'_mean'"					
-					
-					* List variables if there is a constraint violation
-					sort `enum_id'
-					novarabbrev noi l skey `enumvars' `id' `dispvars' `var' if !`var'_sf & team_id == `i', noo sepby(`enum_id')					
-				}
-			}			
+			
+			* Display message if there are no constraint violation
+			if `j' == 0 {
+				noi di "Congratulations, your team has no constraint violations"
+			}
 			
 			if `i' == 0 {
 			
@@ -414,194 +432,174 @@
 				***************************************************************
 				HARD CONSTRAINT VIOLATIONS
 				****************************************************************/
-				check_headers, checknu(8) checkna("HARD CONSTRAINT")
+				noi di
+				noi check_headers, checknu("8") checkna("HARD CONSTRAINT")
 				noi di  
-			
+		
 				* In the firsts iteration, gen flag var for each constraint var
+				
 				if `i' == 0 {
-					foreach var of varlist `v_names' {
-						su `var'
-						loc `var'_mean `r(mean)'
-						gen `var'_hf = (`var' < ``var'_hmin' | `var' > ``var'_hmax')
+				loc j 0
+				forval c = 1/`v_cnt' {
+					foreach var in `v_name' {
+
+						* Check if any member in the team violated constraint and display message
+						count if `var'_hf & team_id == `i'
+						if `r(N)' > 0 {
+							loc `var'_lab: var label `var'
+							noi di in red "The following are soft constraint violations on variable `var'"
+							noi di "{synopt: Variable Description: }" "``var'_lab' {p_end}"
+							noi di "Expected Range	: " _column(18) "`con_`c'_hn' - `con_`c'_hx'"
+							noi di "Average Value	: " _column(18) "`var'_mn'"					
+							
+							sort `enum_id'
+							noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf & team_id == `i', noo sepby(`enum_id') abbrev(32)
+							loc ++j
+						}
 					}
 				}
-				
-				* Check if any members in the team violated constraint and display message
-				count if `var'_hf & team == `i'
-				loc `var'_label: var label `var'
-				
-				* List obs that violate hard constraints. Dont display congrats
-				if  `r(N)' > 0 {
-					noi di in red "The following are hard constraint violations on variable `var'"
-					noi di "Variable Description: " _column(18) "{p} ``var'_label' {smcl}"
-					noi di "Expected Range	: " _column(18) "``var'_hmin' - ``var'_hmax'"
-					noi di "Average Value	: " _column(18) "``var'_mean'"					
-					
-					* List variables if there is a constraint violation
-					sort `enum_id'
-					novarabbrev noi l skey `enumvars' `id' `dispvars' `var' if !`var'_hf & team_id == `i', noo sepby(`enum_id')					
-				}		
+			
+				* Display message if there are no constraint violation
+				if `j' == 0 {
+					noi di "Congratulations, there are no hard constraint violations"
+				}
 
 				/***************************************************************
 				NO MISS:
 				Check that certain critical values have no missing values
 				***************************************************************/
-				check_headers, checknu(9) checkna("NO MISS")
+				noi di
+				noi check_headers, checknu("9") checkna("NO MISS")
 				noi di  
 
 				* Save the vars to check for missing values 
+				
 				#d;
-					loc nm_vars
-							`id'
-							`enumvars'
-							`dispvars'
-							submissiondate
-							starttime
-							endtime
-							skey
-							;
+					ds
+						`id'
+						`enumvars'
+						`dispvars'
+						submissiondate
+						starttime
+						endtime
+						skey
+						audio_audit
+						plot1
+						plot2
+						plot3
+						;
 				#d cr
 				
+				unab nm_vars: `r(varlist)'
+				
 				* Check the number of critical vars with missing values
-				loc nm_track 0
-				foreach var in `nmvars' {
-					cap assert !mi(`var') {
-						if _rc == 9 {
-							loc ++nm_track
-						}
+				loc q 0
+				foreach var in `nm_vars' {
+					cap assert !mi(`var')
+					if _rc == 9 {
+						loc ++q
 					}
 				}
 				
-				if `nm_track' == 0 {
+				if `q' == 0 {
 					noi di "Hurray!! all critical variables do not have missing values"
 				}
+				
+				lab var audio_audit "Audio Audits"
+				lab var plot1 "Plot 1 ID"
 				
 				else {
 				
 					* Displays column headers
-					noi di "{p} Critical variables have missing values in some observations, check survey programming. Details are listed below: {smcl}"
-					noi di as title "variable" _column(20) as title "_#missing" _column(25) as title "variable_label"
+					noi di "{p} `q' Critical variables have missing values in some observations, check survey programming. Details are listed below: {smcl}"
+					noi di  "variable" _column(30) "variable_label"
+					noi di "{hline 80}" 
 
 					foreach var in `nm_vars' {
 						* Check for missing values in var if survey has consent 
-						cap assert !mi(`var') if consent
+						cap assert !mi(`var') if respondent_agree
 						if _rc == 9 {
-				
-							* Display varaibles are var labels for var with missing values
-							foreach var in `nm_vars' {
-								cap assert !mi(`var')
-								if _rc == 9 {
-									loc var_lab: var label `var'
-									count if mi(`var')
-									noi di "`var'" _column(20) as res r(N) "{p 25 25 25 25 25} `var_lab' {smcl}"
-									noi di
-								}					
-							}
-						}
+							loc var_lab: var label `var'
+							noi di "{synopt:`var'}" "`var_lab' {p_end}"
+							noi di 
+						}					
 					}
 				}
 				
 				/***************************************************************
 				ALL MISS. 
 				Display variables that have all missing values
-				****************************************************************/
-				check_headers, checknu(10) checkna("ALL MISS")
+				****************************************************************
+				noi di
+				noi check_headers, checknu("10") checkna("ALL MISS")
 				noi di  
 				
 				* Check that no variable has only missing alues
-				loc nm_track 0
+				loc am 0
 				foreach var of varlist _all {
-					cap assert !mi(`var') {
-						if _rc == 9 {
-							loc ++am_track
-						}
+					cap assert mi(`var')
+					if !_rc {
+						loc ++am
 					}
 				}
 
-				if `am_track' == 0 {
+				if `am' == 0 {
 					noi di "Congratulations, There are no variables with ALL MISSING values"
 				}
-					
+
 				* Display variables with all mising values
 				else {
-					noi di "{p} `am_track' variables have all missing values, This may be " 		///
-							"caused by survey programming errors or surveys skipping this section. "///
-							"check survey programming. Details are listed below: {smcl}"
-					noi di as title "variable" _column(30) as title "variable_label"
-				
-					foreach var in varlist _all {			
+					noi di "{p} `am' variables have all missing values, This may be caused by survey programming errors or surveys skipping this section. Check survey programming. Details are listed below: {p_end}"
+					noi di
+					noi di  "variable" _column(30) "variable_label"
+					noi di "{hline 80}"
+			
+					foreach var of varlist _all {			
 						cap assert mi(`var')
-							if !_rc {
-								loc var_lab: variable label `var'
-								noi di "{synopt:`var'}" "`var_lab' {p_end}"
-							}					
-						}
+						if !_rc {
+							loc var_lab: var label `var'
+							noi di "{synopt:`var'}" "`var_lab' {p_end}"
+						}					
 					}
 				}
+				*/
+				
+				* Save a copy after each loop
+				save "`saving'", replace
 			}
 		}
 		
-		/***********************************************************************
-		Save a copy of the data ready for hfc checks
-		***********************************************************************/
 		// Close log
 		log close
 		
-		// Save file
-		save "`saving'", replace
-
-		
 		/**********************************************************************
-		MISSING RATE PER VARIABLE
-		Check for rate at which each variable is missing per enumerator
+		SKIPTRACE
+		Check the response rate to some questions
 		and export the answeres to a an excel sheet
 		***********************************************************************/
-		
+		/*
 		#d;
 			ds
-				deviceid
-				enum_*
-				,
-				not
+				
 			;
 		#d cr
-		
-		loc mr_vars "`r(varlist)'"
-		foreach var of `ma_vars' {
-			cap assert string var `var' 
-			if !_rc {
-				replace `var' = "1" if mi(`var')
-				replace `var' = "0" if !mi(`var')
-			}
-			
-			else {
-				replace `var' = 1 if mi(`var')
-				replace `var' = 0 if !mi(`var')
-			}
-			
-			destring `var', replace
-			su `var'
-			replace `var' = `r(mean)'
-		}
-		
-		format %5.2 `mr_vars'
-		
-		export excel `mr_vars' using "`missfile'", first(var) sheetmod
+		*/
 	}
 	
 	
 end
 
 prog def check_headers
-
-	syntax,					 ///
-	CHECKNUmber(numeric)	///
+	
+	#d;
+	syntax,					 
+	CHECKNUmber(string)	
 	CHECKNAme(string)
+	;
+	#d cr
 	
 	noi di _dup(82) "*"
-	noi di _dup(82) "-"
 	noi di "CHECK #`checknumber': `checkname'"
-	noi di _dup(82) "-"
 	noi di _dup(82) "*"
 	
 end

@@ -90,7 +90,7 @@
 		***********************************************************************/
 	
 		* Confirm that string specified with directory is an actual directory
-		cap confirm file "`using'.dta"
+		cap confirm file "`using'"
 		if !_rc {
 			use "`using'", clear
 		}
@@ -117,7 +117,7 @@
 				to work with. There is a chance that that the skey may not be
 				unique, but it should always be if combined with id var. */
 				
-				gen s_key = substr(key, -12, .)
+				gen skey = substr(key, -12, .)
 			}
 			
 			* Stop running if key is not unique
@@ -175,7 +175,7 @@
 		datestr submissiondate, newvar(subdate_str)
 		datestr starttime, newvar(startdate_str)
 		datestr endtime, newvar(enddate_str)
-		
+	
 		/***********************************************************************
 		Rename duration var to dur and convert create a new duration varation 
 		that contains the duration in minutes
@@ -211,21 +211,10 @@
 		
 		
 		/***********************************************************************
-		Recode some numeric answers as extended missing values.
-		***********************************************************************/
-		* Save numeric vars in a local numeric
-		ds, has(type numeric)
-		loc numeric `r(varlist)'
-		
-		recode `numeric' (missing 	= .m)	// Missing 
-		recode `numeric' (-999 		= .d)	// Don't Know
-		recode `numeric' (-222		= .o)	// Refuse to Answer
-	
-		/***********************************************************************
 		Save data
 		***********************************************************************/
 		
-		save `saving', replace
+		save "`saving'", replace
 		
 		/***********************************************************************
 		Prepare backcheck data for analysis
@@ -254,6 +243,7 @@ prog def datestr
 	syntax varname, newvar(string)
 		
 	qui {
+
 		gen dofc_temp = dofc(`varlist')
 		gen `newvar'_day = day(dofc_temp)
 		gen `newvar'_mon = month(dofc_temp)
