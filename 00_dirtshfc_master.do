@@ -12,19 +12,22 @@
 SETTING THE STAGE
 *******************************************************************************/
 
-clear all							// Clear all 
-cls									// Clear Results
-vers 			13					// Set to Stata version 13
-set 	maxvar	32000				// Allow up to 20,000 vars
-set		more 	off					// Set more off
-loc		hfcdate	"13_feb_17"			// Set date of interest (format: dd_mm_yy)
+qui {
+	clear all							// Clear all 
+	cls									// Clear Results
+	vers 			13					// Set to Stata version 13
+	set 	maxvar	32000, perm			// Allow up to 20,000 vars
+	set 	matsize 11000, perm			// Set Matsize
+	set		more 	off					// Set more off
+	loc		hfcdate	"13_feb_17"			// Set date of interest (format: dd_mm_yy)
 
-* Set the neccesary directories
+	* Set the neccesary directories
 
-loc main "../08_HFC"
-loc logs "`main'/01_hfc_logs/02_field_pilot/01"
-loc csv "`main'/02_scto_csv/02_field_pilot/01"	// SCTO csv folder
-loc dta "`main'/03_scto_dta/02_field_pilot/01"	// SCTO dta folder
+	loc main "../08_HFC"
+	loc logs "`main'/01_hfc_logs/01_bench_test"
+	loc csv "`main'/02_scto_csv/01_bench_test/02"	// SCTO csv folder
+	loc dta "`main'/03_scto_dta/01_bench_test/02"	// SCTO dta folder
+}
 
 /*******************************************************************************
 INSTALL HFC ADO FILE
@@ -49,48 +52,45 @@ net install dirtshfc, all replace force from("D:/Box Sync/GitHub/dirtshfc")
 IMPORT DATASET
 *******************************************************************************/
 
-* Run SCTO auto generated do-files
 qui {
-/*
-	noi di "Importing Data ..."
-	do "`dta'/import_dirts_annual_survey_2017_full_WIPv2.do"
-	noi di 
-	noi di "Reshaping and merging in repeat groups ..."
 
-	* Run do-file to reshape
-	do "`main'/00_reserve/01_code/reshape_and_merge_field_pilot.do"
-	noi di
-	noi di "Hurray!! Data imported succesfully"
-*/
+* Run SCTO auto generated do-files
+
+	noi di "Importing Data ..."
+	forval r = 1/2 {
+		do "`dta'/r`r'/import_dirts_annual_r`r'_wip.do"
+		noi di 
+		noi di "Data for R`r' imported"
+		noi di
+		do "`main'/00_reserve/01_code/r`r'_reshape_and_merge_bench_test.do"
+		noi di "Repeat groups for R`r' reshaped and merged into main data"
+		noi di 
+	}
+	
+	noi di "Data imported"
 }
 
-/******
-* Create Temp fix for enum_id and enum_name vars
-use "`dta'/dirts_annual_survey_2017v2_WIDE.dta"
-gen audio_consent = 1
-gen enum = 11 in 1/3
-replace enum = 12 in 4/5
-gen surveyor = ""
-replace surveyor = "Mohammed Abdul Manan" if enum == 11
-replace surveyor = "Seidu Ahmed" if enum == 12
-save "`dta'/dirts_annual_survey_2017v2_WIDE_2", replace
-******/
 
 /*******************************************************************************
 PREPARE DATASET FOR HFC
 *******************************************************************************/
-use "`dta'/dirts_annual_survey_2017v2_WIDE_2.dta"
+qui {
 
+	noi di "Preparing data..."
+	noi di
+	forval r = 1/2 {
+		#d;
+		dirtshfc_prep using "`dta'/r`r'/DIRTS Annual R`r' WIP_WIDE.dta", 
+			enumv(user_id username) 															
+			enumd("`main'/dirtshfc_2017_inputs.xlsx") 													
+			sav("`dta'/r`r'/dirts_annual_2017_`r'_preped")	
+			type("r1")
+			;
+		#d cr
+		noi di "R`i' data preped and saved as `dta'/dirts_annual_2017_`r'_preped"
+	}
 
-#d;
-dirtshfc_prep using "`dta'/dirts_annual_survey_2017v2_WIDE_2.dta", 
-	enumv(enum surveyor) 															
-	enumd("`main'/dirtshfc_2017_inputs.xlsx") 													
-	sav("`dta'/dirts_annual_2017_preped")	
-	type("r1")
-	;
-#d cr
-
+stop
 /*******************************************************************************
 MAKE CORRECTIONS TO DATA
 *******************************************************************************/

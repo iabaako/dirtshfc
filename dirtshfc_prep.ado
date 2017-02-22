@@ -20,7 +20,7 @@
 		
 		#d;
 		syntax using/,
-			ENUMVars(varlist min=2 max=2)
+			ENUMVars(namelist min=2 max=2)
 			ENUMDetails(string)			
 			SAVing(string)
 			type(string)
@@ -47,6 +47,15 @@
 		token `enumvars'
 		loc enum_id "`1'"				// Enumerator ID
 		loc enum_name "`2'"				// Enumerator Name
+		
+		* Check that enum vars exist
+		foreach v in `enum_id' `enum_name' {
+			cap confirm var `v'
+			if _rc == 111 {
+				noi di as err "dirtshfc_prep: SYNTAX ERROR!! variable `v' not in data"
+				exit 111
+			}
+		}
 		
 		* Check that type is valid
 		loc type = lower("`type'")
