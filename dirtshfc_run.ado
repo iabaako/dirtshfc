@@ -427,7 +427,7 @@
 						noi di "Average Value	: " _column(18) "``var'_mn'"					
 							
 						sort `enum_id'
-						noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf & team_id == `team', noo sepby(`enum_id') abbrev(32)
+						noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf & !`var'_ok & team_id == `team', noo sepby(`enum_id') abbrev(32)
 						loc ++j
 					}
 				}
@@ -468,7 +468,7 @@
 								noi di "Average Value	: " _column(18) "`var'_mn'"					
 							
 								sort `enum_id'
-								noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf & team_id == `team', noo sepby(`enum_id') abbrev(32)
+								noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf & !`var'_ok, noo sepby(`enum_id') abbrev(32)
 								loc ++j
 							}
 						}

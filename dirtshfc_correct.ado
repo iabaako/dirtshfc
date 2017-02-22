@@ -52,10 +52,19 @@
 		if `r(N)' == 0 {
 			noi di in green "dirtshfc_correct: Hurray!! No need for corrections"
 			
-			* Load data into memory
+			* If there is no need for corrections. Load the data into memory
+			* Create a variable to make all constraint vars as not okay
 			cap confirm file "`using'"
 			if !_rc {
+				* Save constarint vars in a local
+				import exc using "`enumdetails'", sh(constraints) case(l) first clear
+				levelsof variable, loc (vars) clean
+				
 				use "`using'", clear
+				unab vars: `vars'
+				foreach var in `vars' {
+					gen `var'_ok = 0
+				}
 			}
 			
 			* Throw and error if file does not exist

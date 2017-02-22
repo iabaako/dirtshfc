@@ -6,3 +6,7 @@ f dirtshfc_run.ado
 f dirtshfc_err_rates.ado
 f dirtshfc_clean.ado
 f odkmergerepeats.ado
+f bcstats.ado
+f bcstats.sthlp
+f reliabilityratio.ado
+
