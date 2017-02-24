@@ -48,14 +48,6 @@
 		loc enum_id "`1'"				// Enumerator ID
 		loc enum_name "`2'"				// Enumerator Name
 		
-		* Check that enum vars exist
-		foreach v in `enum_id' `enum_name' {
-			cap confirm var `v'
-			if _rc == 111 {
-				noi di as err "dirtshfc_prep: SYNTAX ERROR!! variable `v' not in data"
-				exit 111
-			}
-		}
 		
 		* Check that type is valid
 		loc type = lower("`type'")
@@ -84,7 +76,7 @@
 			noi di
 			noi di as err "{p} Please ensure that all Field Staff have one Unique _ID, " ///
 				"if you added a new Field Staff assign a new ID to that field staff." ///
-				"Re-run the master do-file when this is done.{smcl}"
+				"Re-run the master do-file when this is done.{p_end}"
 			exit 459
 		}
 		
@@ -109,6 +101,16 @@
 			noi di as err "dirtshfc_prep: File `using' not found"
 			exit 601
 		}
+		
+		* Check that enum vars exist
+		foreach v in `enum_id' `enum_name' {
+			cap confirm var `v'
+			if _rc == 111 {
+				noi di as err "dirtshfc_prep: SYNTAX ERROR!! variable `v' not in data"
+				exit 111
+			}
+		}
+
 		
 		* Check that the dataset contains some data
 		if (_N==0) {
@@ -207,22 +209,87 @@
 		* First, remove excess repeat groups
 		* Second, remove values in repeat groups that are not really needed
 		***********************************************************************/
+		drop if mi(key)
+		save "`saving'", replace
+		* Import data from imports sheet
+		import exc using "`enumdetails'", sh(repeats) case(l) first clear
+		levelsof rpt_grp_name if type == "`type'", loc (r_grps) clean
 		
+		* Generate locals to hold repeat trigger and var names
+		foreach g in `r_grps' {
+			levelsof rpt_trigger if rpt_grp_name == "`g'" & type == "`type'", loc (`g'_trig) clean
+			levelsof rpt_vars if rpt_trigger == "``g'_trig'" & rpt_grp_name == "`g'", loc (`g'_vars) clean
+		}
+	
+		* Reload data
+		use "`saving'", clear
+		
+		loc N = _N
+		foreach g in `r_grps' {
+			cap confirm var ``g'_trig'
+			if !_rc {
+				* Loop through each repeat group and drop unneeded vars. For instance if we expect
+				* a max of 25 repeats, drop all 
+				destring ``g'_trig', replace
+				su ``g'_trig'
+				loc rp_max `r(max)'
+				foreach gvar in ``g'_vars' {
+					* Get the length of the string + 1 for the "_"
+					cap unab var: `gvar'*
+					if !_rc {
+						foreach v in `var' {
+							loc tmp_n = substr("`v'", length("`gvar'") + 2, .)
+							if `tmp_n' > `rp_max' {
+								drop `v'
+								noi di "{bf:dropping variable `v'}"
+							}
+							
+							* Now for each repeat group we want to drop the value if the var 
+							* exceed what is expected for that observation. For instance if a farmer 
+							* has 5 plots we want to drop all the values in variables that are based
+							* on the repeat trigger and exceed the 5th count
+
+							forval z = 1/`N' {
+								loc tv = ``g'_trig'[`z'] + 1
+								if !mi("`tv'") & "`tv'" != "." {
+									foreach t in `tv' {
+										cap replace `gvar'_`t' = . in `z'
+										if _rc == 109 {
+											replace `gvar'_`t' = "" in `z'
+										}
+									}
+								}
+							}
+						}	
+					}
+					
+					else {
+						noi di in red "`gvar' not found"
+					}
+				}
+				
+			}
+			
+			
+			else {
+				noi di "`g' not found'"
+			}
+			
+		}
 		
 		/***********************************************************************
-		Replace variables which were skipped due to relevance: In some situations
-		The survey will be programmed to skip so that some questions are not 
-		repeated. For instance if the respondent is the household head, there 
-		will be no need to ask for details of the household head after the details
-		of the respondent has already been taken. 
+		Remove excess plot ids
 		***********************************************************************/
-
-		
-		
+		su plot_nbr
+		loc plot_max = `r(max)' + 1
+		forval z = `plot_max'/30 {
+			drop plot`z'
+		}		
 		/***********************************************************************
 		Save data
 		***********************************************************************/
 		
+		* drop empty observations
 		save "`saving'", replace
 		
 		/***********************************************************************
