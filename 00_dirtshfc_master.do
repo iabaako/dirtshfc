@@ -19,7 +19,7 @@ qui {
 	set 	maxvar	32000, perm			// Allow up to 20,000 vars
 	set 	matsize 11000, perm			// Set Matsize
 	set		more 	off					// Set more off
-	loc		hfcdate	"13_feb_17"			// Set date of interest (format: dd_mm_yy)
+	loc		hfcdate	"27_feb_17"			// Set date of interest (format: dd_mm_yy)
 
 	* Set the neccesary directories
 
@@ -54,7 +54,7 @@ IMPORT DATASET
 
 qui {
 
-* Run SCTO auto generated do-files
+	/* Run SCTO auto generated do-files
 
 	noi di "Importing Data ..."
 	forval r = 1/2 {
@@ -68,33 +68,37 @@ qui {
 	}
 	
 	noi di "Data imported"
+	*/
 }
 
-
+* do "`main'/00_reserve/01_code/temp_ren_r1 vars.do"
 /*******************************************************************************
 PREPARE DATASET FOR HFC
 *******************************************************************************/
+
 qui {
 
+	*
 	noi di "Preparing data..."
 	noi di
 	forval r = 1/2 {
 		#d;
 		dirtshfc_prep using "`dta'/r`r'/DIRTS Annual R`r' WIP_WIDE.dta", 
-			enumv(user_id username) 															
+			enumv(enum_id enum_name) 															
 			enumd("`main'/dirtshfc_2017_inputs.xlsx") 													
-			sav("`dta'/r`r'/dirts_annual_2017_`r'_preped")	
+			sav("`dta'/r`r'/dirts_annual_2017_r`r'_preped")	
 			type("r1")
 			;
 		#d cr
-		noi di "R`i' data preped and saved as `dta'/dirts_annual_2017_`r'_preped"
+		noi di "R`r' data preped and saved as `dta'/dirts_annual_2017_r`r'_preped"
 	}
+	*
+}
 
-stop
 /*******************************************************************************
 MAKE CORRECTIONS TO DATA
 *******************************************************************************/
-
+/*
 #d;
 dirtshfc_correct fprimary using "`dta'/dirts_annual_2017_preped.dta", 
 	enumv(enum surveyor) 															
@@ -103,24 +107,29 @@ dirtshfc_correct fprimary using "`dta'/dirts_annual_2017_preped.dta",
 	sav("`dta'/dirts_annual_2017_post_correction")
 	;
 #d cr
-
+*/
 /*******************************************************************************
 RUN HFCs
 *******************************************************************************/
 
-#d;
-dirtshfc_run fprimary using "`dta'/dirts_annual_2017_post_correction.dta", 
-	date("`hfcdate'")
-	ssdate("10_FEB_17")
-	sedate("28_FEB_17")
-	enumv(enum surveyor)
-	enumd("`main'/dirtshfc_2017_inputs.xlsx")
-	dispv(district community r1_name r2_name)
-	logf("`logs'")
-	sav("`dta'/dirts_annual_2017_post_hfc")
-	type("r1")
-	;
-#d cr
+
+noi di "Running HFCs"
+noi di
+forval r = 1/2 {
+	#d;
+	dirtshfc_run fprimary using "`dta'/r`r'/dirts_annual_2017_r`r'_preped.dta", 
+		date("`hfcdate'")
+		ssdate("10_FEB_17")
+		sedate("28_FEB_17")
+		enumv(enum_id enum_name)
+		enumd("`main'/dirtshfc_2017_inputs.xlsx")
+		dispv(district community r`r'_name)
+		logf("`logs'")
+		sav("`dta'/dirts_annual_2017_r`r'_post_hfc")
+		type("r`r'")
+		;
+	#d cr
+}
 
 stop_all
 /*******************************************************************************
