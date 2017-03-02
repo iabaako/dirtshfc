@@ -63,16 +63,15 @@
 		
 		import exc using "`enumdetails'", sh(enum_details) case(l) first clear
 		destring *_id, replace
-		ren (enum_id enum_name) (`enum_id' `enum_name')
-		drop if mi(`enum_id')
-				
+		ren (enum_id enum_name) (`enum_id' enum_name_keep)
+		drop if mi(`enum_id')		
 		cap isid `enum_id' 
 		if _rc {
 			duplicates tag `enum_id', gen(dup)
 			sort `enum_id'
 			noi di in red "dirtshfc_prep: Variable `enum_id' is not UNIQUE"
 			noi di
-			novarabbrev noi l `enum_id' `enum_name' if dup, noo sepby(`enum_id')
+			novarabbrev noi l `enum_id' enum_name_keep if dup, noo sepby(`enum_id')
 			noi di
 			noi di as err "{p} Please ensure that all Field Staff have one Unique _ID, " ///
 				"if you added a new Field Staff assign a new ID to that field staff." ///
@@ -174,6 +173,9 @@
 		
 		* Merge in enum_data 
 		merge m:1 `enum_id' using "`enum_data'", nogen
+	
+		replace `enum_name' = enum_name_keep
+		drop enum_name_keep
 		
 		* Drop the enum_data from memory
 		macro drop _enum_data
@@ -218,12 +220,13 @@
 		* Generate locals to hold repeat trigger and var names
 		foreach g in `r_grps' {
 			levelsof rpt_trigger if rpt_grp_name == "`g'" & type == "`type'", loc (`g'_trig) clean
-			levelsof rpt_vars if rpt_trigger == "``g'_trig'" & rpt_grp_name == "`g'", loc (`g'_vars) clean
+			levelsof rpt_vars if rpt_trigger == "``g'_trig'" & rpt_grp_name == "`g'" & type == "`type'", loc (`g'_vars) clean
 		}
 	
 		* Reload data
 		use "`saving'", clear
 		
+		/*
 		loc N = _N
 		foreach g in `r_grps' {
 			cap confirm var ``g'_trig'
@@ -236,6 +239,7 @@
 				foreach gvar in ``g'_vars' {
 					* Get the length of the string + 1 for the "_"
 					cap unab var: `gvar'*
+					set trace on
 					if !_rc {
 						foreach v in `var' {
 							loc tmp_n = substr("`v'", length("`gvar'") + 2, .)
@@ -276,6 +280,7 @@
 			}
 			
 		}
+		*/
 		
 		/***********************************************************************
 		Remove excess plot ids

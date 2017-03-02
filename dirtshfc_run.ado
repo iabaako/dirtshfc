@@ -20,13 +20,13 @@
 	prog def dirtshfc_run
 		
 		#d;
-		syntax varname using/, 
+		syntax name using/, 
 		DATE(string)			
 		SSDate(string)			
 		SEDate(string)
 		ENUMDetails(string)
-		ENUMVars(varlist min=2 max=2)
-		DISPVars(varlist)			
+		ENUMVars(namelist min=2 max=2)
+		DISPVars(namelist)			
 		LOGFolder(string)			
 		SAVing(string)
 		type(string)
@@ -62,7 +62,7 @@
 		loc date = upper("`date'")
 		
 		* Represent the id var with the local id
-		loc id `varlist'
+		loc id `namelist'
 
 		/**********************************************************************
 		Import team details sheet and get the names of the teams
@@ -193,8 +193,9 @@
 			noi di  
 			
 			* Create column titles for submission details
+			noi di "{hline 74}"
 			noi di  "`enum_id'" _column(10)  "`enum_name'" _column(35) ///
-				 "hfcdate" _column(47)  "all_sub" _column(58)  "consent_rate(%)" 
+				 "hfcdate" _column(47)  "all_sub" _column(58) "ac_rate" _column(70) "consent_rate(%)" 
 			noi di "{hline 74}"
 			noi di
 			
@@ -212,10 +213,15 @@
 				
 				su respondent_agree if `enum_id' == `enum'
 				loc consent_rate = `r(mean)' * 100
-				loc consent_rate: di %5.2f `consent_rate'
+				loc consent_rate: di %3.0f `consent_rate'
+				
+				su audio_consent if respondent_agree & `enum_id' == `enum'
+				loc ac_rate = `r(mean)' * 100
+				loc ac_rate: di %3.0f `consent_rate'
+
 				
 				noi di "`enum'" _column(10) "`name'" _column(35) "`day_sub'" _column(47) ///
-					"`all_sub'" _column(58) "`consent_rate'%"
+					"`all_sub'" _column(58) "`ac_rate'%" _column(70) "`consent_rate'%"
 			}
 			
 			* drop unneeded macros
@@ -236,6 +242,7 @@
 				noi di "Congratulations, Your Team has no duplicates on `id'"
 			}
 			
+			*set trace on
 			* List observations that are duplicate on on idvar
 			else {		
 				noi di in red "There are `r(N)' duplicates on `id', details are as follows"
@@ -243,39 +250,6 @@
 				noi l skey `enumvars' `id' `dispvars' if dup & team_id == `team', noo sepby(`id') abbrev(32)	
 			}
 			
-			/*******************************************************************
-			HFC CHECK #3: AUDIO CONSENT RATE
-			*******************************************************************/
-			* Create Check Header 
-			
-			noi di
-			noi check_headers, checknu("3") checkna("AUDIO CONSENT RATE (% of Consented Surveys Only)")
-			noi di  
-		
-			* Create display column titles
-			noi di "Audio consent rates (% of Consented Surveys Only) for your team are as follows:"
-			noi di  "`enum_id'" _column(10)  "`enum_name'" _column(35) ///
-			 "ac_rate" _column(50)  "tot_cons_surveys" 
-			noi di "{hline 60}"
-			noi di
-
-			
-			* For each enumerator, display audip consent rate and total consented surveys
-			foreach enum in `enum_itc' {
-				
-				levelsof `enum_name' if `enum_id' == `enum', loc (name) clean
-				
-				count if `enum_id' == `enum' & respondent_agree == 1
-				loc all_sub `r(N)'
-				
-				su audio_consent if `enum_id' == `enum' & !mi(respondent_agree) 
-				loc ac_rate: di %5.2f `r(mean)'
-			
-				noi di "`enum'" _column(10) "`name'" _column(35) "`ac_rate'%" _column(50) "`all_sub'" 
-			}
-			
-			* Drop unneeded macros
-			macro drop _enum _name _ac_rate _all_sub
 			
 			/*******************************************************************
 			HFC CHECK #4: FORM VERSIONS
@@ -283,7 +257,7 @@
 			
 			* Create check headers
 			noi di
-			noi check_headers, checknu("4") checkna("FORM VERSIONS")
+			noi check_headers, checknu("3") checkna("FORM VERSIONS")
 			noi di  
 			
 			* Get the latest form version used on submission date of interest
@@ -316,15 +290,15 @@
 					noi di "`enum'" _column(10) "`name'" _column(35) "`form_version'"
 				}
 			}	
-			
+		
 			
 			/*******************************************************************
-			HFC CHECK #5: CHECK SURVEY DATES
+			HFC CHECK #4: CHECK SURVEY DATES
 			Check that survey dates fall with reasonable minimum and maximum dates
 			*******************************************************************/
 			* Create check headers
 			noi di
-			noi check_headers, checknu("5") checkna("DATES")
+			noi check_headers, checknu("4") checkna("DATES")
 			noi di 
 			
 			if `team' == 0 {
@@ -354,15 +328,15 @@
 				sort `enum_id'
 				noi l skey `enumvars' `id' `dispvars' if !valid_date & team_id == `team', noo sepby(`enum_id')	abbrev(32)
 			}
-
+			
 			/*******************************************************************
-			HFC CHECK #6: DURATION OF SURVEY
+			HFC CHECK #5: DURATION OF SURVEY
 			*******************************************************************/
 			noi di
-			noi check_headers, checknu("6") checkna("DURATION OF SURVEY")
+			noi check_headers, checknu("5") checkna("DURATION OF SURVEY")
 			noi di  
 			
-			* Check that var valid_dur exist. If no creat var
+			* Check that var valid_dur exist. If no create var
 			if `team' == 0 {
 				su duration
 				loc dur_mean `r(mean)'
@@ -384,12 +358,12 @@
 				noi di in red "Durations for the following surveys are too short, average time per survey is `dur_mean' minutes"
 				noi l skey `enumvars' `id' `dispvars' duration if !valid_dur & team_id == `team', noo sepby(`enum_id')	abbrev(32)				
 			}	
-		
+			
 			/*******************************************************************
-			HFC CHECK #7: SOFT CONSTRAINT VIOLATIONS
+			HFC CHECK #6: SOFT CONSTRAINT VIOLATIONS
 			*******************************************************************/
 			noi di
-			noi check_headers, checknu("7") checkna("SOFT CONSTRAINT")
+			noi check_headers, checknu("6") checkna("SOFT CONSTRAINT")
 			noi di  
 		
 			* In the firsts iteration, gen flag var for each constraint var
@@ -438,7 +412,7 @@
 			if `j' == 0 {
 				noi di "Congratulations, your team has no constraint violations"
 			}
-			
+			stop
 			if `team' == 0 {
 			
 				/***************************************************************
