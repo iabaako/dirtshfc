@@ -96,12 +96,29 @@
 		forval i = 1/`v_cnt' {
 			
 			loc con_`i'_var = variable[`i']
+			loc con_`i'_vlab = var_lab[`i']
 			loc con_`i'_hn = hard_min[`i']
 			loc con_`i'_sn = soft_min[`i']
 			loc con_`i'_sx = soft_max[`i']
 			loc con_`i'_hx = hard_max[`i']
+			
 		}
 		
+		/**********************************************************************
+		Import No Miss Variables
+		***********************************************************************/			
+		* Import sheets nomiss variables
+		import exc using "`enumdetails'", sh(nomiss) case(l) first clear
+		drop if mi(variable)
+		count if !mi(variable)
+		loc n_cnt `r(N)'
+		
+		if `n_cnt' > 0 {
+			forval i = 1/`n_cnt' {
+				loc nmv_`i' = variable[`i']
+				loc nml_`i' = var_label[`i']
+			}
+		}
 		/**********************************************************************
 		Import the SCTO generated dataset. This dataset is what is created 
 		after dirtshfc_correct.ado is runs
@@ -164,7 +181,7 @@
 						
 			* start log
 			cap log close
-			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'", replace
+			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'_`type'", replace
 			
 			* Create Header
 			noi di "{hline 120}"
@@ -242,17 +259,16 @@
 				noi di "Congratulations, Your Team has no duplicates on `id'"
 			}
 			
-			*set trace on
 			* List observations that are duplicate on on idvar
 			else {		
 				noi di in red "There are `r(N)' duplicates on `id', details are as follows"
-				sort `id' `dispvars'
+				sort `id' `dispvars' `enum_name'
 				noi l skey `enumvars' `id' `dispvars' if dup & team_id == `team', noo sepby(`id') abbrev(32)	
 			}
 			
 			
 			/*******************************************************************
-			HFC CHECK #4: FORM VERSIONS
+			HFC CHECK #3: FORM VERSIONS
 			*******************************************************************/
 			
 			* Create check headers
@@ -339,7 +355,7 @@
 			* Check that var valid_dur exist. If no create var
 			if `team' == 0 {
 				su duration
-				loc dur_mean `r(mean)'
+				loc dur_mean = floor(`r(mean)')
 				loc valid_dur = `dur_mean' - 60
 				gen valid_duration = duration >= `valid_dur'
 			}
@@ -365,125 +381,274 @@
 			noi di
 			noi check_headers, checknu("6") checkna("SOFT CONSTRAINT")
 			noi di  
-		
-			* In the firsts iteration, gen flag var for each constraint var
-		
-			forval c = 1/`v_cnt' {
-				loc j 0
-				unab v_name: `con_`c'_var'
+			
+			/* Generate soft flags during the first iteration based on the constraints 
+				specified in the constraint sheet of the inputs workbook. The constraints 
+				could generally be in 2 forms. 
+				1. As a number eg. 0 or 100 
+				2. As another variable
 				
-				* Omit names of flags from the list to use
-				if `team' != 0 {
-					ds *_sf *_hf
-					loc omit `r(varlist)'
-					loc v_name: list v_name - omit
-				}
+			*/
+			
+			* set trace on
+			if `team' == 0 { 
+				forval i = 1/`v_cnt' {
+					unab con_v: `con_`i'_var'
+					cap unab cv_omit: *_sf
+					if _rc == 111 {
+						loc cv_omit ""
+					}
+					loc con_v: list con_v - cv_omit
+					destring `con_v', replace
+					loc cnt_v: word count of `con_v'
 				
-				foreach var in `v_name' {
-					if `team' == 0 {
-						su `var'
-						loc `var'_mn `r(mean)'
-						gen `var'_sf = !mi(`var') & ((`var' < `con_`c'_sn') | (`var' > `con_`c'_sx'))
-						gen `var'_hf = !mi(`var') & ((`var' < `con_`c'_hn') | (`var' > `con_`c'_hx'))
-						
-						* Label flag variables
-						lab var `var'_sf "Flag soft constraint violation"
-						lab var `var'_hf "Flag hard constraint violation"
+					* Check that the soft minimum value is a number
+					cap confirm n `con_`i'_sn'
+					if !_rc {
+						if `cnt_v' == 1 {
+							gen `con_v'_sf = `con_v' < `con_`i'_sn'
+						}
+					
+						else {
+							foreach v in `con_v' {
+								gen `v'_sf = `v' < `con_`i'_sn'
+							}
+						}
+					}
+				
+					else {
+						unab con_n: `con_`i'_sn'
+						destring `con_n', replace
+						loc cnt_n: word count of `con_n'
+					
+						if `cnt_n' == 1 {
+							foreach v in `con_v' {
+								gen `v'_sf = `v' < `con_n'
+							}
+
+						}
+					
+						else {
+							loc cv = subinstr("`con_`i'_sx'", "*", "", .)
+							loc j 1
+							foreach v in `con_v' {
+								gen `v'_sf = `v' < `cv'_`j'
+								loc ++j
+							}
+						}
+					}
+				
+					* Check that the soft max value is a number
+					cap confirm n `con_`i'_sx'
+					if !_rc {
+						if `cnt_v' == 1 {
+							replace `con_v'_sf = `con_v' > `con_`i'_sx' & !mi(`con_v')
+						}
+					
+						else {
+							foreach v in `con_v' {
+								replace `v'_sf = `v' > `con_`i'_sx' & !mi(`v')
+							}
+						}
 					}
 					
-					* Check if any member in the team violated constraint and display message
+					else {
+						unab con_x: `con_`i'_sx'
+						destring `con_x', replace
+						loc cnt_x: word count of `con_x'
+					
+						if `cnt_x' == 1 {
+							foreach v in `con_v' {
+								gen `v'_sf = `v' > `con_x' & !mi(`v')
+							}
+
+						}
+					
+						else {
+							loc cv = subinstr("`con_`i'_sx'", "*", "", .)
+							loc j 1
+							foreach v in `con_v' {
+								replace `v'_sf = `v' > `cv'_`j' & !mi(`v')
+								loc ++j
+							}
+						}
+					}
+				}
+			}
+			
+			loc j 0
+			cap unab c_omit: *_sf *_hf
+			if _rc == 111 {
+				unab c_omit: *_sf
+			}
+			
+			forval i = 1/`v_cnt' {
+				unab con_v: `con_`i'_var'
+				loc con_v: list con_v - c_omit
+				foreach var in `con_v' {
 					count if `var'_sf & team_id == `team'
-					if `r(N)' > 0 {
-						loc `var'_lab: var label `var'
+					loc c_trg `r(N)'
+					if `c_trg' > 0 {
 						noi di in red "The following are soft constraint violations on variable `var'"
-						noi di "{synopt: Variable Description: }" "``var'_lab' {p_end}"
-						noi di "Expected Range	: " _column(18) "`con_`c'_sn' - `con_`c'_sx'"
-						noi di "Average Value	: " _column(18) "``var'_mn'"					
+						noi di "{synopt: Variable Description: }" "`con_`i'_vlab' {p_end}"
+						noi di "Expected Range	: " _column(18) "`con_`i'_sn' - `con_`i'_sx'"				
 							
 						sort `enum_id'
-						noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf & !`var'_ok & team_id == `team', noo sepby(`enum_id') abbrev(32)
+						cap confirm var `var'_ok
+						if !_rc {
+							cap noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf & !`var'_ok, noo sepby(`enum_id') abbrev(32)
+						}
+						else {
+							noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf, noo sepby(`enum_id') abbrev(32)
+						}
 						loc ++j
 					}
 				}
 			}
 			
-			
-			* Display message if there are no constraint violation
 			if `j' == 0 {
-				noi di "Congratulations, your team has no constraint violations"
+				noi di "Congratulation, your team has no soft constraint violation"
 			}
-			stop
+			
 			if `team' == 0 {
 			
 				/***************************************************************
+				CHECK 7:
 				THIS IS TO INCLUDE SOME FEW MORE CHECKS FOR PROGRAMMING ERRORS
 				THESE WILL ONLY APPEAR IN THE MASTER LOG SHEET
 				***************************************************************
 				HARD CONSTRAINT VIOLATIONS
 				****************************************************************/
 				noi di
-				noi check_headers, checknu("8") checkna("HARD CONSTRAINT")
+				noi check_headers, checknu("7") checkna("HARD CONSTRAINT")
 				noi di  
-		
-				* In the firsts iteration, gen flag var for each constraint var
 				
-				if `team' == 0 {
-					loc j 0
-					forval c = 1/`v_cnt' {
-						foreach var in `v_name' {
+				forval i = 1/`v_cnt' {
+					unab con_v: `con_`i'_var'
+					cap unab cv_omit: *_sf *_hf
+					if _rc == 111 {
+						unab cv_omit: *_sf
+					}
+					loc con_v: list con_v - cv_omit
+					destring `con_v', replace
+					loc cnt_v: word count of `con_v'
+				
+					* Check that the soft minimum value is a number
+					cap confirm n `con_`i'_hn'
+					if !_rc {
+						if `cnt_v' == 1 {
+							gen `con_v'_hf = `con_v' < `con_`i'_hn'
+						}
+					
+						else {
+							foreach v in `con_v' {
+								gen `v'_hf = `v' < `con_`i'_hn'
+							}
+						}
+					}
+				
+					else {
+						unab con_n: `con_`i'_hn'
+						destring `con_n', replace
+						loc cnt_n: word count of `con_n'
+					
+						if `cnt_n' == 1 {
+							foreach v in `con_v' {
+								gen `v'_hf = `v' < `con_n'
+							}
 
-							* Check if any member in the team violated constraint and display message
-							count if `var'_hf & team_id == `team'
-							if `r(N)' > 0 {
-								loc `var'_lab: var label `var'
-								noi di in red "The following are soft constraint violations on variable `var'"
-								noi di "{synopt: Variable Description: }" "``var'_lab' {p_end}"
-								noi di "Expected Range	: " _column(18) "`con_`c'_hn' - `con_`c'_hx'"
-								noi di "Average Value	: " _column(18) "`var'_mn'"					
-							
-								sort `enum_id'
-								noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf & !`var'_ok, noo sepby(`enum_id') abbrev(32)
+						}
+						
+						else {
+							loc cv = subinstr("`con_`i'_hn'", "*", "", .)
+							loc j 1
+							foreach v in `con_v' {
+								gen `v'_hf = `v' < `cv'_`j'
+								loc ++j
+							}
+						}
+
+					}
+					
+					* Check that the soft max value is a number
+					cap confirm n `con_`i'_hx'
+					if !_rc {
+						if `cnt_v' == 1 {
+							replace `con_v'_hf = `con_v' > `con_`i'_hx' & !mi(`con_v')
+						}
+					
+						else {
+							foreach v in `con_v' {
+								replace `v'_hf = `v' > `con_`i'_hx' & !mi(`v')
+							}
+						}
+					}
+					
+					else {
+						unab con_x: `con_`i'_hx'
+						destring `con_x', replace
+						loc cnt_x: word count of `con_x'
+					
+						if `cnt_x' == 1 {
+							foreach v in `con_v' {
+								gen `v'_hf = `v' > `con_x' & !mi(`v')
+							}
+
+						}
+						
+						else {
+							loc cv = subinstr("`con_`i'_hx'", "*", "", .)
+							loc j 1
+							foreach v in `con_v' {
+								replace `v'_hf = `v' > `cv'_`j' & !mi(`v')
 								loc ++j
 							}
 						}
 					}
 				}
-			
-				* Display message if there are no constraint violation
-				if `j' == 0 {
-					noi di "Congratulations, there are no hard constraint violations"
+				
+				loc j 0
+				unab c_omit: *_sf *_hf
+				forval i = 1/`v_cnt' {
+					unab con_v: `con_`i'_var'
+					loc con_v: list con_v - c_omit
+					foreach var in `con_v' {
+						count if `var'_hf & team_id == `team'
+						loc c_trg `r(N)'
+						if `c_trg' > 0 {
+							noi di in red "The following are hard constraint violations on variable `var'"
+							noi di "{synopt: Variable Description: }" "`con_`i'_vlab' {p_end}"
+							noi di "Expected Range	: " _column(18) "`con_`i'_hn' - `con_`i'_hx'"				
+							
+							sort `enum_id'
+							cap confirm var `var'_ok
+							if !_rc {
+								cap noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf & !`var'_ok, noo sepby(`enum_id') abbrev(32)
+							}
+							else {
+								noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf, noo sepby(`enum_id') abbrev(32)
+							}
+							loc ++j
+						}
+					}
 				}
 				
-				macro drop _`var'_mn
-
 				/***************************************************************
-				NO MISS:
+				CHECK 8: NO MISS
 				Check that certain critical values have no missing values
 				***************************************************************/
 				noi di
-				noi check_headers, checknu("9") checkna("NO MISS")
+				noi check_headers, checknu("8") checkna("NO MISS")
 				noi di  
 
 				* Save the vars to check for missing values 
 				
-				#d;
-					ds
-						`id'
-						`enumvars'
-						`dispvars'
-						submissiondate
-						starttime
-						endtime
-						skey
-						;
-				#d cr
-				
-				unab nm_vars: `r(varlist)'
-				
 				* Check the number of critical vars with missing values
+				
+				* set trace on
 				loc q 0
-				foreach var in `nm_vars' {
-					cap assert !mi(`var')
+				forval i = 1/`n_cnt' {
+					cap assert !mi(`nmv_`i'')
 					if _rc == 9 {
 						loc ++q
 					}
@@ -493,36 +658,36 @@
 					noi di "Hurray!! all critical variables do not have missing values"
 				}
 				
-				lab var audio_audit "Audio Audits"
-				lab var plot1 "Plot 1 ID"
-				
 				else {
 				
 					* Displays column headers
-					noi di "{p} `q' Critical variables have missing values in some observations, check survey programming. Details are listed below: {smcl}"
-					noi di  "variable" _column(30) "variable_label"
+					
+					noi di "{p} `q' Critical variables have missing values in some observations, check survey programming. Details are listed below: {p_end}"
+					noi di "{hline 80}" 
+					noi di  "variable" _column(30) "var_label"
 					noi di "{hline 80}" 
 
-					foreach var in `nm_vars' {
+					forval i = 1/`n_cnt' {
 						* Check for missing values in var if survey has consent 
-						cap assert !mi(`var') if respondent_agree
+						cap assert !mi(`nmv_`i'') if respondent_agree
 						if _rc == 9 {
-							loc var_lab: var label `var'
-							noi di "{synopt:`var'}" "`var_lab' {p_end}"
+							noi di "{synopt:`nmv_`i''}" "`nml_`i'' {p_end}"
 							noi di 
 						}					
 					}
 				}
 				
+			
 				/***************************************************************
+				CHECK 9:
 				ALL MISS. 
 				Display variables that have all missing values
 				****************************************************************/
 				noi di
-				noi check_headers, checknu("10") checkna("ALL MISS")
+				noi check_headers, checknu("9") checkna("ALL MISS")
 				noi di  
 				
-				* Check that no variable has only missing alues
+				/* Check that no variable has only missing alues
 				loc am 0
 				foreach var of varlist _all {
 					cap assert mi(`var')
@@ -537,7 +702,8 @@
 
 				* Display variables with all mising values
 				else {
-					noi di "{p} `am' variables have all missing values, This may be caused by survey programming errors or surveys skipping this section. Check survey programming. Details are listed below: {p_end}"
+					noi di "{hline 80}"
+					noi di "{p} `am' variables have all missing values, This may be caused by survey programming errors or surveyors skipping this section. Check survey programming. Details are listed below: {p_end}"
 					noi di
 					noi di  "variable" _column(30) "variable_label"
 					noi di "{hline 80}"
@@ -550,6 +716,7 @@
 						}					
 					}
 				}
+				
 				*/
 				
 				* Save a copy after each loop
@@ -557,21 +724,186 @@
 			}
 		}
 		
-		* Close log
 		log close
 		
+		* Save a copy after each loop
+		cap drop *_sf *_hf *_ok
+		save "`saving'", replace
+		
 		/**********************************************************************
+		Check 10:
 		SKIPTRACE
-		Check the response rate to some questions
+		Check the responses to some questions
 		and export the answeres to a an excel sheet
 		***********************************************************************/
-		/*
+		
+		import exc using "`enumdetails'", sh(skiptrace) case(l) first clear
+		levelsof keepvars, loc (st_kvs) clean
+		
+		keep if type == "`type'"
+		count if !mi(variable)
+		loc v_cnt `r(N)'
+		forval i = 1/`v_cnt' {
+			loc trvar_`i' = variable[`i']
+			loc vlab_`i' = var_lab[`i']
+			loc trval_`i' = trace_values[`i']
+		}
+		
+		use "`saving'", clear
+		loc trvars ""
+		* set trace on
+		forval i = 1/`v_cnt' {
+			unab vars: `trvar_`i''
+			loc vals `trval_`i''
+			loc trvars "`trvars' `vars'"
+			foreach tv in `vars' {
+				tostring `tv', replace force
+				foreach v in `vals' {
+					gen _tmp = "_" + subinstr(`tv', " ", "_", .) + "_"
+					replace `tv' = ".y" if regexm(_tmp, "_`v'_")
+					replace `tv' = ".n" if !regexm(_tmp, "_`v'_") & `tv' != ".y"
+					drop _tmp
+				}				
+			} 
+		} 
+		
+		keep `st_kvs' `trvars'
+		order `st_kvs'
+		destring `trvars', replace
+
+		foreach tv in `trvars' {
+			replace `tv' = 0 if `tv' == .y
+			replace `tv' = 1 if `tv' == .n
+			bysort `enum_id': egen _tmp = mean(`tv')
+			replace `tv' = _tmp
+			format `tv' %5.2f
+			drop _tmp
+		}
+	
+		bysort `enum_id': gen n = _n
+		keep if n == 1
+		drop n
+		
+		export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("skiptrace") sheetmod first(var)
+		/**********************************************************************
+		Check 11:
+		MISSING RESPONSE RATE
+		Check the missing responses rate of some questions
+		and export the answeres to a an excel sheet
+		***********************************************************************/
+		use "`saving'", clear
+		
 		#d;
-			ds
-				
-			;
+		
+		loc exc_vars 
+				`id'
+				`enumvars'
+				`dispvars'
+				respondent_agree
+				audio_consent
+				team_*
+				deviceid
+				submissiondate
+				subdate
+				startdate
+				starttime
+				endtime
+				enddate
+				dur 
+				duration
+				resp_confirm
+				text_audit
+				;
 		#d cr
-		*/
+		
+		ds `exc_vars', not
+		loc vars `r(varlist)'
+		foreach var in `vars' {
+			* set trace on
+			cap replace `var' = 1 if mi(`var') & `var' != .o
+			if !_rc {
+				replace `var' = 0 if !mi(`var') | `var' == .o
+			}
+			if _rc {
+				replace `var' = "1" if mi(`var')
+				replace `var' = "0" if !mi(`var')
+			}
+			
+			destring `var', replace
+			bysort `enum_id': egen _tmp = mean(`var')
+			replace `var' = _tmp
+			drop _tmp
+			format `var' %5.2f 
+		}
+		
+		bysort `enum_id': gen n = _n
+		keep if n == 1
+		keep `dispvars' `enumvars' `vars' 
+		order `dispvars' `enumvars'
+		
+		export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("missing_rate") sheetmod first(var) nol
+		
+		
+		/**********************************************************************
+		Check 12:
+		DONT KNOW RESPONSE RATE
+		Check the dont know responses rate of some questions
+		and export the answeres to a an excel sheet
+		***********************************************************************/
+
+		foreach var in `vars' {
+			* set trace on
+			cap confirm str var `var' 
+			if _rc == 7 {
+				replace `var' = `var' == .d
+			}
+			
+			else if !_rc {
+				replace `var' = regexm(`var', "-999") 
+			}
+			
+			destring `var', replace
+			bysort `enum_id': egen `var' = mean(`var')
+			format `var' %5.2f 
+		}
+		
+		bysort `enum_id': gen n = _n
+		keep if n == 1
+		keep `dispvars' `enumvars' `vars' 
+		order `dispvars' `enumvars'
+		
+		export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("dontknow_rate") sheetmod first(var) nol
+		
+				/**********************************************************************
+		Check 12:
+		DONT KNOW RESPONSE RATE
+		Check the dont know responses rate of some questions
+		and export the answeres to a an excel sheet
+		***********************************************************************/
+		
+		foreach var in `vars' {
+			* set trace on
+			cap confirm str var `var' 
+			if _rc == 7 {
+				replace `var' = `var' == .r
+			}
+			
+			else if !_rc {
+				replace `var' = regexm(`var', "-888") 
+			}
+			
+			destring `var', replace
+			bysort `enum_id': egen `var' = mean(`var')
+			format `var' %5.2f 
+		}
+		
+		bysort `enum_id': gen n = _n
+		keep if n == 1
+		keep `dispvars' `enumvars' `vars' 
+		order `dispvars' `enumvars'
+		
+		export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("refusal_rate") sheetmod first(var) nol
+
 	}
 	
 	
