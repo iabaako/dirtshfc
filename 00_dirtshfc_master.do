@@ -47,41 +47,26 @@ qui {
 */
 
 net install dirtshfc, all replace force from("D:/Box Sync/GitHub/dirtshfc")
-
+/*
 /*******************************************************************************
 IMPORT DATASET
 *******************************************************************************/
 
 qui {
-
-	/* Run SCTO auto generated do-files
-
 	noi di "Importing Data ..."
-	forval r = 1/2 {
+	forval r = 1/1 {
 		do "`dta'/r`r'/import_dirts_annual_r`r'_wip.do"
-		noi di 
-		noi di "Data for R`r' imported"
-		noi di
 		do "`main'/00_reserve/01_code/r`r'_reshape_and_merge_bench_test.do"
-		noi di "Repeat groups for R`r' reshaped and merged into main data"
-		noi di 
 	}
-	
-	noi di "Data imported"
-	*/
 }
 
-* do "`main'/00_reserve/01_code/temp_ren_r1 vars.do"
 /*******************************************************************************
 PREPARE DATASET FOR HFC
 *******************************************************************************/
 
 qui {
-
-	*
-	noi di "Preparing data..."
-	noi di
-	forval r = 1/2 {
+	noi di "Preparing Data for HFCs ... "
+	forval r = 1/1 {
 		#d;
 		dirtshfc_prep using "`dta'/r`r'/DIRTS Annual R`r' WIP_WIDE.dta", 
 			enumv(enum_id enum_name) 															
@@ -90,34 +75,32 @@ qui {
 			type("r1")
 			;
 		#d cr
-		noi di "R`r' data preped and saved as `dta'/dirts_annual_2017_r`r'_preped"
-	}
-	*
+	}	
 }
 
 /*******************************************************************************
 MAKE CORRECTIONS TO DATA
 *******************************************************************************/
-/*
-#d;
-dirtshfc_correct fprimary using "`dta'/dirts_annual_2017_preped.dta", 
-	enumv(enum surveyor) 															
-	corrf("`main'/dirtshfc_2017_inputs.xlsx")
-	logf("`logs'/corrections_log_`hfcdate'")
-	sav("`dta'/dirts_annual_2017_post_correction")
-	;
-#d cr
 */
+
+forval r = 1/1 {
+	#d;
+	dirtshfc_correct fprimary using "`dta'/r`r'/dirts_annual_2017_r`r'_preped.dta", 
+		enumv(enum_id enum_name) 															
+		corrf("`main'/dirtshfc_2017_inputs.xlsx")
+		logf("`logs'/`hfcdate'/corrections_log_r`r'_`hfcdate'")
+		sav("`dta'/r`r'/dirts_annual_2017_r`r'_post_correction")
+		;
+	#d cr
+}
+
 /*******************************************************************************
 RUN HFCs
 *******************************************************************************/
 
-
-noi di "Running HFCs"
-noi di
-forval r = 1/2 {
+forval r = 1/1 {
 	#d;
-	dirtshfc_run fprimary using "`dta'/r`r'/dirts_annual_2017_r`r'_preped.dta", 
+	dirtshfc_run fprimary using "`dta'/r`r'/dirts_annual_2017_r`r'_post_correction.dta", 
 		date("`hfcdate'")
 		ssdate("10_FEB_17")
 		sedate("28_FEB_17")
