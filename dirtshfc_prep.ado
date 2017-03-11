@@ -167,7 +167,7 @@
 				simid 
 				devicephonenum 
 				username 
-				caseid *_temp* *_helper*			
+				caseid *_helper*			
 				;
 		#d cr
 		

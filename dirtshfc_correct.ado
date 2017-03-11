@@ -18,8 +18,8 @@
 	prog def dirtshfc_correct
 	
 		#d;
-		syntax varname using/,			
-		ENUMVars(varlist min=2 max=2)	
+		syntax name using/,			
+		ENUMVars(namelist min=2 max=2)	
 		CORRFile(string)				
 		LOGfile(string)					
 		SAVing(string)
@@ -39,7 +39,7 @@
 		}
 		
 		* Represent the id var with the local id
-		loc id `varlist'
+		loc id `namelist'
 		
 		/***********************************************************************
 		Import corrections file details and save it in a tempfile
@@ -118,7 +118,7 @@
 			}
 		
 			cap log close
-			log using "`logfile'", replace text
+			log using "`logfile'.smcl", replace 
 			
 			
 			* Create Header
@@ -135,18 +135,20 @@
 			noi di _dup(82) "-"
 			noi di "{hline 82}"
 		
-			use `corr_data', clear
+			use "`using'", clear
 			/*******************************************************************
 			Mark Flagged observations as okay. Some observatios may be flagged as 
 			outliers or suspicious but upon investigation may be deemed as okay.
 			********************************************************************/
 			
-			if `hfc_drop' > 0 {
+			if `hfc_okay' > 0 {
 			
 				use `corr_data', clear
 			
-				noi di as title "{bf: Marked `hfc_okay' flagged issues as okay, Details are as follows:"
-				noi di as title "s_key" _column(15) as title "`id'" _column(25) as title "variable" _column(40) as title "value"
+				noi di "{bf: Marked `hfc_okay' flagged issues as okay, Details are as follows:}"
+				noi di
+				noi di "s_key" _column(15) "`id'" _column(30) "variable" _column(60) "value"
+				noi di "{hline 82}"
 				
 				keep if action == 0
 				
@@ -161,20 +163,21 @@
 				* Load dataset and mark as okay. For each var, create a var *_ok
 				use "`using'", clear
 				forval i = 1/`hfc_okay' {
-				
-					* Check that the entries in the correction sheets are valid
-					foreach name in "`skey_`i''" "``id'_`i''" "`variable_`i''" "`value'_`i'" {
-						* Get the actual name of the variable
-						loc name = substr("`name'", 1, length(`name') - length(`i')) 
-						
-						* Check that value is in the dataset before dropping
-						cap assert `name' != "``name'_`i''"
-						if !_rc {
-							noi di as err "dirtshfc_correct: Wrong skey(``name'_`i'') specified in correction sheet"
-							exit 9
-						}
+					
+					* set trace on
+					* Check that the skey and ids entered are in the dataset
+					cap assert skey != "`skey_`i''"						
+					if !_rc {
+						noi di as err "dirtshfc_correct: Wrong skey(`skey_`i'') specified in correction sheet"
+						exit 9
 					}
-				
+					
+					cap assert `id' != "``id'_`i''"						
+					if !_rc {
+						noi di as err "dirtshfc_correct: Wrong `id'(``id'_`i'') specified in correction sheet"
+						exit 9
+					}
+
 					* Check if the variable marker exist, else create it
 					cap confirm var `variable_`i''_ok 
 					if _rc == 111 {
@@ -188,23 +191,22 @@
 					}
 					
 					else {
-						replace `variable_`i''_ok = 1 if skey == "`skey_`i''" & hhid == "``id'_`i''" ///
+						replace `variable_`i''_ok = 1 if skey == "`skey_`i''" & `id' == "``id'_`i''" ///
 							& `variable_`i'' == `value_`i''
 					}
 					
 					* Display some details about the var been marked as okay
-					noi di as title "`skey_`i''" _column(15) as title "``id'_`i''" _column(25) ///
-						as title "`variable_`i''" _column(40) as title "`value_`i''"
+					noi di "`skey_`i''" _column(15) "``id'_`i''" _column(30) "`variable_`i''" _column(60) "`value_`i''"
 				}
 				
-				* save dataset
-				save "`saving'", replace
-				
 				* drop macros
-				macro drop _skey_* _`id'_* _variable_* _value'_*
+				macro drop _skey_* _`id'_* _variable_* _value_*
 	
 			}
 			
+			* save dataset
+			save "`saving'", replace
+	
 			noi di
 			
 			/*******************************************************************
@@ -214,8 +216,9 @@
 			
 			if `hfc_drop' > 0 {
 				use `corr_data', clear
-				noi di as title "{bf: Dropped `hfc_drop' observations from the dataset, Details are as follows:"
-				noi di as title "skey" _column(15) as title "`id'"
+				noi di "{bf: Dropped `hfc_drop' observations from the dataset, Details are as follows:}"
+				noi di "skey" _column(15) "`id'"
+				noi di "{hline 82}"
 				
 				*keep only observations in corr sheet that will be dropped
 				keep if action == 1
@@ -229,32 +232,29 @@
 				* Load the dataset, loop through and drop the obs with matching keys and hhids
 				use "`saving'", clear
 				forval i = 1/`hfc_drop' {
-					* Check that the entries in the correction sheets are valid
-					foreach name in "`skey_`i''" "``id'_`i''" {
-						* Get the actual name of the variable
-						loc name = substr("`name'", 1, length(`name') - length(`i')) 
-						
 					
-						* Check that value is in the dataset before dropping
-						cap assert `name' != "``name'_`i''"
-						if !_rc {
-							noi di as err "dirtshfc_correct: Wrong skey(``name'_`i'') specified in correction sheet"
-							exit 9
-						}
+					cap assert skey != "`skey_`i''"						
+					if !_rc {
+						noi di as err "dirtshfc_correct: Wrong skey(`skey_`i'') specified in correction sheet"
+						exit 9
+					}
+					
+					cap assert `id' != "``id'_`i''"						
+					if !_rc {
+						noi di as err "dirtshfc_correct: Wrong `id'(``id'_`i'') specified in correction sheet"
+						exit 9
 					}
 
-					
 					drop if skey == "`skey_`i''" & `id' == "``id'_`i''"
-					noi di as "`skey_`i'" _column(15) "``id'_`i''"
+					noi di "`skey_`i''" _column(15) "``id'_`i''"
 				}
 				
-				* save dataset
-				save "`saving'", replace
-				
 				* drop macros
-				macro drop _skey_* _`id'_* _variable_* _value'_*
+				macro drop _skey_* _`id'_* _variable_* _value_*
 			}
 			
+			* save dataset
+			save "`saving'", replace
 			noi di 
 			
 			/*******************************************************************
@@ -263,12 +263,13 @@
 		
 			if `hfc_rep' > 0 {
 				use `corr_data', clear
-				noi di as title "{bf: Replaced `hfc_rep' flagged issues, Details are as follows:"
-				noi di as title "skey" _column(15) as title "`id'" _column(25) ///
-					as title "variable" _column(40) as title "value" _column(55) as title "new_value" 
+				noi di "{bf: Replaced `hfc_rep' flagged issues, Details are as follows:}"
+				noi di "skey" _column(15) "`id'" _column(30) "variable" _column(55) "value" _column(65) "new_value" 
+				noi di "{hline 82}"
 				
 				keep if action == 2
 				
+				* set trace on
 				* Save s_keys, hhids, variable names and values in locals
 				forval i = 1/`hfc_rep' {
 					loc skey_`i' = skey[`i']
@@ -278,34 +279,37 @@
 					loc new_value_`i' = new_value[`i']
 				}
 				
-				use "`saving'", cllear
+				use "`saving'", clear
 				
-				* Check that the entries in the correction sheets are valid
-				foreach name in "`skey_`i''" "``id'_`i''" "`variable_`i''" "`value'_`i'" "`new_value_`i''" {	
-					* Get the actual name of the variable
-					loc name = substr("`name'", 1, length(`name') - length(`i')) 
-						
-					* Check that value is in the dataset before dropping
-					cap assert `name' != "``name'_`i''"
+				forval i = 1/`hfc_rep' {
+					
+					* Check that skey and id vars specified are correct
+					cap assert skey != "`skey_`i''"						
 					if !_rc {
-						noi di as err "dirtshfc_correct: Wrong skey(``name'_`i'') specified in correction sheet"
+						noi di as err "dirtshfc_correct: Wrong skey(`skey_`i'') specified in correction sheet"
 						exit 9
 					}
-				}
-								
-				cap confirm string var `variable_`i'' 
-				if !_rc {
-					replace `variable_`i'' = "`new_value'" if s_key == "`skey_`i''" & `id' == "``id'_`i''" ///
-						& `variable_`i'' == "`value_`i''"
-				}
+				
+					cap assert `id' != "``id'_`i''"						
+					if !_rc {
+						noi di as err "dirtshfc_correct: Wrong `id'(``id'_`i'') specified in correction sheet"
+						exit 9
+					}
+				
+					cap confirm string var `variable_`i'' 
+					if !_rc {
+						replace `variable_`i'' = "`new_value_`i''" if s_key == "`skey_`i''" & `id' == "``id'_`i''" ///
+							& `variable_`i'' == "`value_`i''"
+					}
 					
-				else {
-					replace `variable_`i'' = `new_value' if skey == "`skey_`i''" & `id' == "`hhid'" ///
-						& `variable_`i'' == `value_`i''
-				}
+					else {
+						replace `variable_`i'' = `new_value_`i'' if skey == "`skey_`i''" & `id' == "``id'_`i''" ///
+							& `variable_`i'' == `value_`i''
+					}
 						
-				noi di as title "`skey_`i''" _column(15) as title "``id'_`i''" _column(25) ///
-					as title "`variable_`i''" _column(40) as title "`value_`i''" _column(55) as title "`new_value_`i''"
+					noi di "`skey_`i''" _column(15) "``id'_`i''" _column(30) "`variable_`i''" ///
+						_column(55) "`value_`i''" _column(65) "`new_value_`i''"
+				}
 			}
 		}
 		noi di

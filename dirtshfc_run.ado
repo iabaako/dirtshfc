@@ -170,12 +170,14 @@
 			
 			* 
 			else if `t1' == 1 {
+				use "`saving'", clear
 				replace team_id = team_id_keep
 				drop team_id_keep
 				loc team_name "`team_`t1''"
 			}
 			
 			else {
+				use "`saving'", clear
 				loc team_name "`team_`t1''"
 			}
 						
@@ -265,7 +267,6 @@
 				sort `id' `dispvars' `enum_name'
 				noi l skey `enumvars' `id' `dispvars' if dup & team_id == `team', noo sepby(`id') abbrev(32)	
 			}
-			
 			
 			/*******************************************************************
 			HFC CHECK #3: FORM VERSIONS
@@ -372,7 +373,7 @@
 			else {
 				sort `enum_id'
 				noi di in red "Durations for the following surveys are too short, average time per survey is `dur_mean' minutes"
-				noi l skey `enumvars' `id' `dispvars' duration if !valid_dur & team_id == `team', noo sepby(`enum_id')	abbrev(32)				
+				noi l skey `enumvars' `id' `dispvars' duration if !valid_dur & team_id == `team' & hfc, noo sepby(`enum_id')	abbrev(32)				
 			}	
 			
 			/*******************************************************************
@@ -389,12 +390,11 @@
 				2. As another variable
 				
 			*/
-			
-			* set trace on
+						
 			if `team' == 0 { 
 				forval i = 1/`v_cnt' {
 					unab con_v: `con_`i'_var'
-					cap unab cv_omit: *_sf
+					cap unab cv_omit: *_ok
 					if _rc == 111 {
 						loc cv_omit ""
 					}
@@ -476,17 +476,22 @@
 				}
 			}
 			
+			
 			loc j 0
-			cap unab c_omit: *_sf *_hf
+			cap unab c_omit: *_sf *_hf *_ok
 			if _rc == 111 {
-				unab c_omit: *_sf
+				unab c_omit: *_sf *_ok
 			}
 			
 			forval i = 1/`v_cnt' {
 				unab con_v: `con_`i'_var'
 				loc con_v: list con_v - c_omit
 				foreach var in `con_v' {
-					count if `var'_sf & team_id == `team'
+					cap confirm var `var'_ok
+					if _rc {
+						gen `var'_ok = 0
+					}
+					count if `var'_sf & team_id == `team' & !`var'_ok
 					loc c_trg `r(N)'
 					if `c_trg' > 0 {
 						noi di in red "The following are soft constraint violations on variable `var'"
@@ -494,13 +499,7 @@
 						noi di "Expected Range	: " _column(18) "`con_`i'_sn' - `con_`i'_sx'"				
 							
 						sort `enum_id'
-						cap confirm var `var'_ok
-						if !_rc {
-							cap noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf & !`var'_ok, noo sepby(`enum_id') abbrev(32)
-						}
-						else {
-							noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf, noo sepby(`enum_id') abbrev(32)
-						}
+						cap noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf & !`var'_ok, noo sepby(`enum_id') abbrev(32)
 						loc ++j
 					}
 				}
@@ -522,12 +521,12 @@
 				noi di
 				noi check_headers, checknu("7") checkna("HARD CONSTRAINT")
 				noi di  
-				
+				* set trace on
 				forval i = 1/`v_cnt' {
 					unab con_v: `con_`i'_var'
-					cap unab cv_omit: *_sf *_hf
+					cap unab cv_omit: *_sf *_hf *_ok
 					if _rc == 111 {
-						unab cv_omit: *_sf
+						unab cv_omit: *_sf *_ok
 					}
 					loc con_v: list con_v - cv_omit
 					destring `con_v', replace
@@ -608,12 +607,17 @@
 				}
 				
 				loc j 0
-				unab c_omit: *_sf *_hf
+				unab c_omit: *_sf *_hf *_ok
 				forval i = 1/`v_cnt' {
 					unab con_v: `con_`i'_var'
 					loc con_v: list con_v - c_omit
 					foreach var in `con_v' {
-						count if `var'_hf & team_id == `team'
+						cap confirm var `var'_ok
+						if _rc {
+							gen `var'_ok = 0
+						}
+						count if `var'_hf & team_id == `team' & !`var'_ok
+						
 						loc c_trg `r(N)'
 						if `c_trg' > 0 {
 							noi di in red "The following are hard constraint violations on variable `var'"
@@ -621,17 +625,19 @@
 							noi di "Expected Range	: " _column(18) "`con_`i'_hn' - `con_`i'_hx'"				
 							
 							sort `enum_id'
-							cap confirm var `var'_ok
-							if !_rc {
-								cap noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf & !`var'_ok, noo sepby(`enum_id') abbrev(32)
-							}
-							else {
-								noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf, noo sepby(`enum_id') abbrev(32)
-							}
+							cap noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf & !`var'_ok, noo sepby(`enum_id') abbrev(32)
 							loc ++j
 						}
 					}
 				}
+				
+				if `j' == 0 {
+					noi di "Congratulation, your team has no hard constraint violation"
+				}
+				
+				* Save a copy after first loop
+				save "`saving'", replace
+				cap drop *_sf *_hf *_ok
 				
 				/***************************************************************
 				CHECK 8: NO MISS
@@ -677,7 +683,6 @@
 					}
 				}
 				
-			
 				/***************************************************************
 				CHECK 9:
 				ALL MISS. 
@@ -719,17 +724,11 @@
 				
 				*/
 				
-				* Save a copy after each loop
-				save "`saving'", replace
 			}
 		}
 		
 		log close
-		
-		* Save a copy after each loop
-		cap drop *_sf *_hf *_ok
-		save "`saving'", replace
-		
+				
 		/**********************************************************************
 		Check 10:
 		SKIPTRACE
@@ -792,6 +791,7 @@
 		and export the answeres to a an excel sheet
 		***********************************************************************/
 		use "`saving'", clear
+		cap drop *_sf *_hf *_ok
 		
 		#d;
 		
@@ -813,96 +813,196 @@
 				duration
 				resp_confirm
 				text_audit
+				audio_audit
 				;
 		#d cr
 		
 		ds `exc_vars', not
 		loc vars `r(varlist)'
+		loc ms_track 0
+		loc miss_vars ""
 		foreach var in `vars' {
 			* set trace on
-			cap replace `var' = 1 if mi(`var') & `var' != .o
-			if !_rc {
-				replace `var' = 0 if !mi(`var') | `var' == .o
-			}
-			if _rc {
-				replace `var' = "1" if mi(`var')
-				replace `var' = "0" if !mi(`var')
+			cap assert !mi(`var')
+			if _rc == 9 {
+				cap assert mi(`var')
+				if _rc == 9 {
+					cap confirm str var `var'
+					if _rc == 7 {
+						replace `var' = .y if mi(`var') & `var' != .o
+						replace `var' = .n if `var' != .y
+						loc cnt 1
+					}
+					
+					else if !_rc {
+						replace `var' = ".y" if mi(`var')
+						replace `var' = ".n" if `var' != ".y"
+						loc cnt 1
+					}
+					
+				}
+				
+				else if !_rc {
+					drop `var'
+					loc cnt 0
+				}
 			}
 			
-			destring `var', replace
-			bysort `enum_id': egen _tmp = mean(`var')
-			replace `var' = _tmp
-			drop _tmp
-			format `var' %5.2f 
+			else if !_rc {
+				drop `var'
+				loc cnt 0
+			}
+			
+			if `cnt' == 1 { 
+				loc miss_vars "`miss_vars' `var'"
+				destring `var', replace
+				replace `var' = `var' == .y
+			
+				bysort `enum_id': egen _tmp = mean(`var')
+				replace `var' = _tmp
+				drop _tmp
+				format `var' %5.2f 
+				loc ms_track = `ms_track' + `cnt'
+			}
+			
 		}
 		
-		bysort `enum_id': gen n = _n
-		keep if n == 1
-		keep `dispvars' `enumvars' `vars' 
-		order `dispvars' `enumvars'
+		if `ms_track' > 0 {
+			bysort `enum_id': gen n = _n
+			bysort `enum_id': gen total_surveys = _N
+			keep if n == 1
+			keep `dispvars' team_name `enumvars' total_surveys `miss_vars' 
+			order `dispvars' team_name `enumvars' total_surveys
 		
-		export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("missing_rate") sheetmod first(var) nol
-		
-		
+			export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("missing_rate") sheetmod first(var) nol
+		}
+	
 		/**********************************************************************
 		Check 12:
 		DONT KNOW RESPONSE RATE
 		Check the dont know responses rate of some questions
 		and export the answeres to a an excel sheet
 		***********************************************************************/
-
+		
+		* set trace on
+		use "`saving'", clear
+		cap drop *_sf *_hf *_ok
+		
+		loc track_nm 0
 		foreach var in `vars' {
 			* set trace on
 			cap confirm str var `var' 
 			if _rc == 7 {
-				replace `var' = `var' == .d
+				cap assert `var' != .d
+				if _rc == 9 {
+					replace `var' = `var' == .d
+					loc cnt 1
+				}
+				else if !_rc {
+					drop `var'
+					loc cnt 0
+				}
 			}
 			
 			else if !_rc {
-				replace `var' = regexm(`var', "-999") 
+				cap assert !regexm(`var', "-999")
+				if _rc == 9 {
+					replace `var' = ".y" if regexm(`var', "-999")
+					replace `var' = ".n" if `var' != ".y"
+					destring `var', replace 
+					replace `var' = `var' == .y
+					loc cnt 1
+				}
+				
+				else if !_rc {
+					drop `var' 
+					loc cnt 0
+				}
 			}
 			
-			destring `var', replace
-			bysort `enum_id': egen `var' = mean(`var')
-			format `var' %5.2f 
+			if `cnt' == 1 {
+				bysort `enum_id': egen _tmp = mean(`var')
+				replace `var' = _tmp
+				format `var' %5.2f
+				drop _tmp
+				loc rate_vars "`rate_vars' `var'"
+				loc track_nm = `track_nm' + `cnt'
+			}
 		}
 		
-		bysort `enum_id': gen n = _n
-		keep if n == 1
-		keep `dispvars' `enumvars' `vars' 
-		order `dispvars' `enumvars'
+		if `track_nm' > 0 {
+			bysort `enum_id': gen n = _n
+			bysort `enum_id': gen total_surveys = _N
+			keep if n == 1
+			keep `dispvars' team_name `enumvars' total_surveys `rate_vars'
+			order `dispvars' team_name `enumvars' total_surveys
+			
+			export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("dontknow_rate") sheetmod first(var) nol
+		}
 		
-		export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("dontknow_rate") sheetmod first(var) nol
-		
-				/**********************************************************************
-		Check 12:
-		DONT KNOW RESPONSE RATE
-		Check the dont know responses rate of some questions
+
+		/**********************************************************************
+		Check 13:
+		REFUSAL RATE RESPONSE RATE
+		Check for refusal responses rate of some questions
 		and export the answeres to a an excel sheet
 		***********************************************************************/
 		
+		use "`saving'", clear
+		cap drop *_sf *_hf *_ok
+		
+		loc track_nm 0
+		loc rate_vars ""
 		foreach var in `vars' {
 			* set trace on
 			cap confirm str var `var' 
 			if _rc == 7 {
-				replace `var' = `var' == .r
+				cap assert `var' != .r
+				if _rc == 9 {
+					replace `var' = `var' == .r
+					loc cnt 1
+				}
+				else if !_rc {
+					drop `var'
+					loc cnt 0
+				}
 			}
 			
 			else if !_rc {
-				replace `var' = regexm(`var', "-888") 
+				cap assert !regexm(`var', "-888")
+				if _rc == 9 {
+					replace `var' = ".y" if regexm(`var', "-888")
+					replace `var' = ".n" if `var' != ".y"
+					destring `var', replace 
+					replace `var' = `var' == .y
+					loc cnt 1
+				}
+				
+				else if !_rc {
+					drop `var' 
+					loc cnt 0
+				}
 			}
 			
-			destring `var', replace
-			bysort `enum_id': egen `var' = mean(`var')
-			format `var' %5.2f 
+			if `cnt' == 1 {
+				bysort `enum_id': egen _tmp = mean(`var')
+				replace `var' = _tmp
+				format `var' %5.2f
+				drop _tmp
+				loc rate_vars "`rate_vars' `var'"
+				loc track_nm = `track_nm' + `cnt'
+			}
 		}
 		
-		bysort `enum_id': gen n = _n
-		keep if n == 1
-		keep `dispvars' `enumvars' `vars' 
-		order `dispvars' `enumvars'
+		if `track_nm' > 0 {
+			bysort `enum_id': gen n = _n
+			bysort `enum_id': gen total_surveys = _N
+			keep if n == 1
+			keep `dispvars' team_name `enumvars' total_surveys `rate_vars'
+			order `dispvars' team_name `enumvars' total_surveys
 		
-		export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("refusal_rate") sheetmod first(var) nol
+			export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("refusal_rate") sheetmod first(var) nol
+		}
 
 	}
 	
