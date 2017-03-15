@@ -11,22 +11,23 @@
 ********************************************************************************
 SETTING THE STAGE
 *******************************************************************************/
+* set rmsg on
 
 qui {
 	clear all							// Clear all 
 	cls									// Clear Results
 	vers 			13					// Set to Stata version 13
-	set 	maxvar	32000, perm			// Allow up to 20,000 vars
+	set 	maxvar	32000, perm			// Allow up to 32,000 vars
 	set 	matsize 11000, perm			// Set Matsize
 	set		more 	off					// Set more off
 	loc		hfcdate	"27_feb_17"			// Set date of interest (format: dd_mm_yy)
 
 	* Set the neccesary directories
 
-	loc main "../08_HFC"
-	loc logs "`main'/01_hfc_logs/01_bench_test"
-	loc csv "`main'/02_scto_csv/01_bench_test/02"	// SCTO csv folder
-	loc dta "`main'/03_scto_dta/01_bench_test/02"	// SCTO dta folder
+	gl main "../08_HFC"								// Main Folder
+	gl logs "$main/01_hfc_logs/02_field_pilot/02"	// Log Folder
+	gl csv "$main/02_scto_csv/02_field_pilot/02"	// SCTO csv folder
+	gl dta "$main/03_scto_dta/02_field_pilot/02"	// SCTO dta folder
 }
 
 /*******************************************************************************
@@ -47,74 +48,73 @@ qui {
 */
 
 net install dirtshfc, all replace force from("D:/Box Sync/GitHub/dirtshfc")
-/*
+
 /*******************************************************************************
 IMPORT DATASET
 *******************************************************************************/
-
+/*
 qui {
 	noi di "Importing Data ..."
-	forval r = 1/1 {
-		do "`dta'/r`r'/import_dirts_annual_r`r'_wip.do"
-		do "`main'/00_reserve/01_code/r`r'_reshape_and_merge_bench_test.do"
+	foreach r in r1d1 r1d2 r2 {
+		do "$dta/`r'/import_dirts_annual_`r'.do"
+		gl ur "`r'"
+		do "$main/00_reserve/01_code/reshape_and_merge_field_pilot.do"
 	}
 }
-
+*/
 /*******************************************************************************
 PREPARE DATASET FOR HFC
 *******************************************************************************/
 
-qui {
-	noi di "Preparing Data for HFCs ... "
-	forval r = 1/1 {
-		#d;
-		dirtshfc_prep using "`dta'/r`r'/DIRTS Annual R`r' WIP_WIDE.dta", 
-			enumv(enum_id enum_name) 															
-			enumd("`main'/dirtshfc_2017_inputs.xlsx") 													
-			sav("`dta'/r`r'/dirts_annual_2017_r`r'_preped")	
-			type("r1")
-			;
-		#d cr
-	}	
-}
-
+foreach r in r1d1 r1d2 r2 {
+	#d;
+	dirtshfc_prep using "$dta/`r'/dirts_annual_2017_fpv_`r'_wide.dta", 
+		enumv(researcher_id researcher_name) 															
+		enumd("$main/dirtshfc_2017_inputs.xlsx") 													
+		sav("$dta/`r'/dirts_annual_2017_fpv_`r'_preped")	
+		rty("`r'")
+		;
+	#d cr
+}	
+stop_prep
 /*******************************************************************************
 MAKE CORRECTIONS TO DATA
 *******************************************************************************/
-*/
 
-forval r = 1/1 {
+foreach r in r1d1 r1d2 r2 {
 	#d;
-	dirtshfc_correct fprimary using "`dta'/r`r'/dirts_annual_2017_r`r'_preped.dta", 
+	dirtshfc_correct fprimary using "$dta/dirts_annual_2017_fpv_`r'_preped.dta", 
 		enumv(enum_id enum_name) 															
-		corrf("`main'/dirtshfc_2017_inputs.xlsx")
-		logf("`logs'/`hfcdate'/corrections_log_r`r'_`hfcdate'")
-		sav("`dta'/r`r'/dirts_annual_2017_r`r'_post_correction")
+		corrf("$main/dirtshfc_2017_inputs.xlsx")
+		logf("$logs/`hfcdate'/corrections_log_`r'_`hfcdate'")
+		sav("$dta/`r'/dirts_annual_2017_fpv_`r'_post_correction")
+		rty("`r'")
 		;
 	#d cr
 }
-
+stop_correct
 /*******************************************************************************
 RUN HFCs
 *******************************************************************************/
 
-forval r = 1/1 {
+foreach r in r1d1 r1d2 r2 {
+	loc rnv = substr("`r'", 1, 2)
 	#d;
-	dirtshfc_run fprimary using "`dta'/r`r'/dirts_annual_2017_r`r'_post_correction.dta", 
+	dirtshfc_run fprimary using "$dta/dirts_annual_2017_fpv_`r'_post_correction.dta", 
 		date("`hfcdate'")
 		ssdate("10_FEB_17")
 		sedate("28_FEB_17")
 		enumv(enum_id enum_name)
-		enumd("`main'/dirtshfc_2017_inputs.xlsx")
-		dispv(district community r`r'_name)
-		logf("`logs'")
-		sav("`dta'/dirts_annual_2017_r`r'_post_hfc")
-		type("r`r'")
+		enumd("$main/dirtshfc_2017_inputs.xlsx")
+		dispv(district community `rnv'_name)
+		logf("$logs")
+		sav("$dta/`r'/dirts_annual_2017_fpv_`r'_post_hfc")
+		rtype("`r'")
 		;
 	#d cr
 }
 
-stop_all
+stop_run
 /*******************************************************************************
 RUN BACK CHECK ANALYSES
 *******************************************************************************/
