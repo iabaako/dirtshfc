@@ -1,4 +1,4 @@
-*! version 0.0.5 Ishmail Azindoo Baako (IPA) Feb, 2016
+*! version 1.0.0 Ishmail Azindoo Baako (IPA) Mar, 2016
 
 /* 
 	This stata program is part of the HFC for the DIRTS Annual Survey 2017. 
@@ -23,7 +23,7 @@
 			ENUMVars(namelist min=2 max=2)
 			ENUMDetails(string)			
 			SAVing(string)
-			type(string)
+			RTYpe(string)
 			[
 			BCData(string)				
 			BCSave(string)
@@ -50,9 +50,9 @@
 		
 		
 		* Check that type is valid
-		loc type = lower("`type'")
-		if "`type'" != "r1" & "`type'" != "r2" {
-			noi di as err "dirtshfc_prep: SYNTAX ERROR!! Specify r1 or r2 with type"
+		loc rtype = lower("`rtype'")
+		if "`rtype'" != "r1d1" & "`rtype'" != "r1d2" & "`rtype'" != "r2" {
+			noi di as err "{p}dirtshfc_prep: SYNTAX ERROR!! Option `rtype' not allowed. Specify r1d1, r1d2 or r2 with rtype{p_end}"
 			exit 601
 		}
 		
@@ -215,18 +215,17 @@
 		save "`saving'", replace
 		* Import data from imports sheet
 		import exc using "`enumdetails'", sh(repeats) case(l) first clear
-		levelsof rpt_grp_name if type == "`type'", loc (r_grps) clean
+		levelsof rpt_grp_name if rtype == "`rtype'", loc (r_grps) clean
 		
 		* Generate locals to hold repeat trigger and var names
 		foreach g in `r_grps' {
-			levelsof rpt_trigger if rpt_grp_name == "`g'" & type == "`type'", loc (`g'_trig) clean
-			levelsof rpt_vars if rpt_trigger == "``g'_trig'" & rpt_grp_name == "`g'" & type == "`type'", loc (`g'_vars) clean
+			levelsof rpt_trigger if rpt_grp_name == "`g'" & rtype == "`rtype'", loc (`g'_trig) clean
+			levelsof rpt_vars if rpt_trigger == "``g'_trig'" & rpt_grp_name == "`g'" & rtype == "`rtype'", loc (`g'_vars) clean
 		}
 	
 		* Reload data
 		use "`saving'", clear
 		
-		/*
 		loc N = _N
 		foreach g in `r_grps' {
 			cap confirm var ``g'_trig'
@@ -239,7 +238,6 @@
 				foreach gvar in ``g'_vars' {
 					* Get the length of the string + 1 for the "_"
 					cap unab var: `gvar'*
-					set trace on
 					if !_rc {
 						foreach v in `var' {
 							loc tmp_n = substr("`v'", length("`gvar'") + 2, .)
@@ -267,9 +265,6 @@
 						}	
 					}
 					
-					else {
-						noi di in red "`gvar' not found"
-					}
 				}
 				
 			}
@@ -280,7 +275,6 @@
 			}
 			
 		}
-		*/
 		
 		/***********************************************************************
 		Recode numeric variables
@@ -293,10 +287,12 @@
 		/***********************************************************************
 		Remove excess plot ids
 		***********************************************************************/
-		su plot_nbr
-		loc plot_max = `r(max)' + 1
-		forval z = `plot_max'/30 {
-			drop plot`z'
+		cap su plot_nbr
+		if !_rc {
+			loc plot_max = `r(max)' + 1
+			forval z = `plot_max'/30 {
+				drop plot`z'
+			}
 		}		
 		/***********************************************************************
 		Save data

@@ -1,4 +1,4 @@
-*! version 0.0.1 Ishmail Azindoo Baako (IPA) Jan, 2016
+*! version 1.0.0 Ishmail Azindoo Baako (IPA) Mar, 2016
 
 /* 
 	This stata program is part of the HFC for the DIRTS Annual Survey 2017. 
@@ -23,6 +23,7 @@
 		CORRFile(string)				
 		LOGfile(string)					
 		SAVing(string)
+		RTYpe(string)
 		;
 		#d cr
 
@@ -38,6 +39,14 @@
 			exit 601
 		}
 		
+		* Check that type is valid
+		loc rtype = lower("`rtype'")
+		if "`rtype'" != "r1d1" & "`rtype'" != "r1d2" & "`rtype'" != "r2" {
+			noi di as err "{p}dirtshfc_prep: SYNTAX ERROR!! Option `type' not allowed. Specify r1d1, r1d2 or r2 with type{p_end}"
+			exit 601
+		}
+
+		
 		* Represent the id var with the local id
 		loc id `namelist'
 		
@@ -46,18 +55,20 @@
 		***********************************************************************/
 		tempfile corr_data 
 		import exc using "`corrfile'", sh(corrections) case(l) first clear
+		keep if rtype == "`rtype'"
 		count if !mi(skey)
 		
 		* Check that the dataset contains some data. If not skip correctiosn
 		if `r(N)' == 0 {
-			noi di in green "dirtshfc_correct: Hurray!! No need for corrections"
+			noi di in green "dirtshfc_correct: Hurray!! No need for corrections for survey `rtype'"
 			
-			* If there is no need for corrections. Load the data into memory
-			* Create a variable to make all constraint vars as not okay
+			* If there is need for corrections. Load the data into memory
+			* Create a variable to mark all constraint vars as not okay
 			cap confirm file "`using'"
 			if !_rc {
 				* Save constarint vars in a local
 				import exc using "`enumdetails'", sh(constraints) case(l) first clear
+				keep if rtype == "`rtype'" 
 				levelsof variable, loc (vars) clean
 				
 				use "`using'", clear

@@ -3,11 +3,12 @@
 
 ********************************************************************************
 *set directory of all the repeat group datasets
-global importdata "../08_HFC/03_scto_dta/01_bench_test/02/r2"
+loc ur = upper("$ur")
+global importdata "$dta/$ur"
 
 * Set the directory for the xls version of the questionaire
-loc survey "../08_HFC/00_reserve/04_questionnaire/DIRTS Annual Survey R2 WIP"
-loc surveyname "DIRTS Annual R2 WIP"
+loc survey "$main/00_reserve/04_questionnaire/DIRTS Annual `ur' WIP"
+loc surveyname "DIRTS Annual 2017 FPV `ur'"
 
 * Check through the questionnaire and list the names of repeat groups
 import excel "`survey'.xlsx", sh("survey") case(l) first clear 
@@ -25,6 +26,7 @@ loc rpts: list uniq rpts
 
 * Put the list together listing nested first
 loc all_rpts: list n_rpts | rpts
+noi di "`all_rpts'"
 
 *  Check in folder for repeat groups
 
@@ -40,6 +42,7 @@ foreach r in `all_rpts' {
 	}
 }
 
+gl loop `loop'
 ********************************************************************************
 
 *open and save main dataset with new name
@@ -182,4 +185,9 @@ foreach lp in $loop {
 	local i = `i'+1
 }
 
-save "$importdata`surveyname'_WIDE", replace
+ren researchername researcher_id
+
+loc savedata = subinstr("`sname'", " ", "_", .)
+save "$dta/$ur/`savedata'_wide", replace
+
+macro drop _loop
