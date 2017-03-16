@@ -55,6 +55,7 @@
 		***********************************************************************/
 		tempfile corr_data 
 		import exc using "`corrfile'", sh(corrections) case(l) first clear
+		tostring rtype, replace
 		keep if rtype == "`rtype'"
 		count if !mi(skey)
 		
@@ -67,7 +68,8 @@
 			cap confirm file "`using'"
 			if !_rc {
 				* Save constarint vars in a local
-				import exc using "`enumdetails'", sh(constraints) case(l) first clear
+				import exc using "`corrfile'", sh(constraints) case(l) first clear
+				tostring rtype == "`rtype'"
 				keep if rtype == "`rtype'" 
 				levelsof variable, loc (vars) clean
 				

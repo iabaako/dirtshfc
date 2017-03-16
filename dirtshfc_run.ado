@@ -29,7 +29,7 @@
 		DISPVars(namelist)			
 		LOGFolder(string)			
 		SAVing(string)
-		type(string)
+		RTYpe(string)
 		;
 		#d cr
 
@@ -46,9 +46,9 @@
 		}
 		
 		* Check that type is valid
-		loc type = lower("`type'")
-		if "`type'" != "r1" & "`type'" != "r2" {
-			noi di as err "dirtshfc_prep: SYNTAX ERROR!! Specify r1 or r2 with type"
+		loc type = lower("`rtype'")
+		if "`rtype'" != "r1d1" & "`rtype'" != "r1d2" & "`rtype'" != "r2" {
+			noi di as err "dirtshfc_prep: SYNTAX ERROR!! Specify r1d1, r1d2 or r2 with type"
 			exit 601
 		}
 
@@ -134,7 +134,7 @@
 			
 		* Throw an error if file does not exist
 		else {	
-			noi di as err "dirtshfc_run: File `dataset' not found"
+			noi di as err "dirtshfc_run: File `using' not found"
 			exit 601
 		}
 		
@@ -183,7 +183,7 @@
 						
 			* start log
 			cap log close
-			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'_`type'", replace
+			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'_`rtype'", replace
 			
 			* Create Header
 			noi di "{hline 120}"
@@ -212,10 +212,10 @@
 			noi di  
 			
 			* Create column titles for submission details
-			noi di "{hline 74}"
-			noi di  "`enum_id'" _column(10)  "`enum_name'" _column(35) ///
-				 "hfcdate" _column(47)  "all_sub" _column(58) "ac_rate" _column(70) "consent_rate(%)" 
-			noi di "{hline 74}"
+			noi di "{hline 90}"
+			noi di  "`enum_id'" _column(15)  "`enum_name'" _column(50) ///
+				 "hfcdate" _column(62)  "all_sub" _column(72) "ac_rate" _column(82) "consent_rate(%)" 
+			noi di "{hline 90}"
 			noi di
 			
 			
@@ -239,8 +239,9 @@
 				loc ac_rate: di %3.0f `consent_rate'
 
 				
-				noi di "`enum'" _column(10) "`name'" _column(35) "`day_sub'" _column(47) ///
-					"`all_sub'" _column(58) "`ac_rate'%" _column(70) "`consent_rate'%"
+				noi di "`enum'" _column(15) "`name'" _column(50) "`day_sub'" _column(62) ///
+					"`all_sub'" _column(72) "`ac_rate'%" _column(82) "`consent_rate'%"
+				* noi di _dup(90) "."
 			}
 			
 			* drop unneeded macros
@@ -308,7 +309,6 @@
 				}
 			}	
 		
-			
 			/*******************************************************************
 			HFC CHECK #4: CHECK SURVEY DATES
 			Check that survey dates fall with reasonable minimum and maximum dates
@@ -330,7 +330,7 @@
 				loc survey_end = date("`sedate'", "DM20Y")
 				
 				* Generate a dummy var = 1 if date for observation is valid
-				gen valid_date = start_date >= `survey_start' | end_date <= `survey_end'
+				gen valid_date = start_date >= `survey_start' & end_date <= `survey_end'
 			}
 			
 			* Count the number of obs in team with invalid dates. Display messages
@@ -343,9 +343,9 @@
 			else {
 				noi di in red "Some interview dates are outside the expected range `ssdate' and `sedate', details: "
 				sort `enum_id'
-				noi l skey `enumvars' `id' `dispvars' if !valid_date & team_id == `team', noo sepby(`enum_id')	abbrev(32)
+				noi l skey `enumvars' `id' `dispvars' startdate_str enddate_str if !valid_date & team_id == `team', noo sepby(`enum_id')	abbrev(32)
 			}
-			
+
 			/*******************************************************************
 			HFC CHECK #5: DURATION OF SURVEY
 			*******************************************************************/
@@ -375,7 +375,7 @@
 				noi di in red "Durations for the following surveys are too short, average time per survey is `dur_mean' minutes"
 				noi l skey `enumvars' `id' `dispvars' duration if !valid_dur & team_id == `team' & hfc, noo sepby(`enum_id')	abbrev(32)				
 			}	
-			
+			stop
 			/*******************************************************************
 			HFC CHECK #6: SOFT CONSTRAINT VIOLATIONS
 			*******************************************************************/
@@ -739,7 +739,7 @@
 		import exc using "`enumdetails'", sh(skiptrace) case(l) first clear
 		levelsof keepvars, loc (st_kvs) clean
 		
-		keep if type == "`type'"
+		keep if type == "`rtype'"
 		count if !mi(variable)
 		loc v_cnt `r(N)'
 		forval i = 1/`v_cnt' {
@@ -783,7 +783,7 @@
 		keep if n == 1
 		drop n
 		
-		export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("skiptrace") sheetmod first(var)
+		export exc using "`logfolder'/`date'/dirts_hfc_output_`rtype'.xlsx", sh("skiptrace") sheetmod first(var)
 		/**********************************************************************
 		Check 11:
 		MISSING RESPONSE RATE
@@ -874,7 +874,7 @@
 			keep `dispvars' team_name `enumvars' total_surveys `miss_vars' 
 			order `dispvars' team_name `enumvars' total_surveys
 		
-			export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("missing_rate") sheetmod first(var) nol
+			export exc using "`logfolder'/`date'/dirts_hfc_output_`rtype'.xlsx", sh("missing_rate") sheetmod first(var) nol
 		}
 	
 		/**********************************************************************
@@ -937,7 +937,7 @@
 			keep `dispvars' team_name `enumvars' total_surveys `rate_vars'
 			order `dispvars' team_name `enumvars' total_surveys
 			
-			export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("dontknow_rate") sheetmod first(var) nol
+			export exc using "`logfolder'/`date'/dirts_hfc_output_`rtype'.xlsx", sh("dontknow_rate") sheetmod first(var) nol
 		}
 		
 
@@ -1001,7 +1001,7 @@
 			keep `dispvars' team_name `enumvars' total_surveys `rate_vars'
 			order `dispvars' team_name `enumvars' total_surveys
 		
-			export exc using "`logfolder'/`date'/dirts_hfc_output_`type'.xlsx", sh("refusal_rate") sheetmod first(var) nol
+			export exc using "`logfolder'/`date'/dirts_hfc_output_`rtype'.xlsx", sh("refusal_rate") sheetmod first(var) nol
 		}
 
 	}
