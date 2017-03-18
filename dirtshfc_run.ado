@@ -52,6 +52,13 @@
 			exit 601
 		}
 
+		if "`rtype'" == "r1d1" {
+			loc logopt "replace"
+		}
+		
+		else {
+			loc logopt "append"
+		}
 		
 		* Get the enumerator related vars from arg enumvars
 		token `enumvars'
@@ -73,15 +80,15 @@
 		
 		* Get the team ids
 		levelsof team_id, loc (team_ids) clean
-		loc team_cnt: word count `team_ids'
+		loc team_cnt = wordcount("`team_ids'")
+		count if !mi(enum_id)
 		
 		* Loop through the team ids and for each id get the name and save it a local
 		loc x 0
 		foreach t in `team_ids' {
 			loc ++x
-			levelsof team_name if team_id == `t', loc(team_`x') clean			
+			levelsof team_name if team_id == `t', loc(team_`x') clean	
 		}
-		
 		
 		/**********************************************************************
 		Import constraint values
@@ -143,7 +150,7 @@
 		if _rc == 601 {
 			mkdir "`logfolder'/`date'"
 		}
-		
+	
 		/***********************************************************************
 		HIGH FREQUENCY CHECKS
 		
@@ -165,10 +172,10 @@
 				replace team_id = 0
 				
 				* tag all duplicates on id var
-				duplicates tag `id', gen(dup)
+				duplicates tag `id' if !mi(key), gen(dup)
 			}
 			
-			* 
+ 
 			else if `t1' == 1 {
 				use "`saving'", clear
 				replace team_id = team_id_keep
@@ -183,7 +190,7 @@
 						
 			* start log
 			cap log close
-			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'_`rtype'", replace
+			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'", `logopt'
 			
 			* Create Header
 			noi di "{hline 120}"
@@ -202,6 +209,23 @@
 			noi di "{hline 120}"
 			
 			
+			/*******************************************************************
+			HFC CHECK #0: SUMMARIES
+			*******************************************************************/
+			* Create headers for check
+			noi di
+			noi check_headers, checknu("0") checkna("SUMMARIES")
+			noi di  
+			
+			levelsof `enum_id' if team_id == `team' & !mi(`enum_id'), loc (team_enums) clean
+			loc team_size = wordcount("`team_enums'")
+			noi di "Team Size:" _column(30) "`team_size'"
+			count if team_id == `team' & !mi(key)
+			noi di "Team Submissions(All):" _column(30) "`r(N)'"
+			count if team_id == `team' & !mi(key) & hfc
+			noi di "Team Submissions(`date'):" _column(30) "`r(N)'"
+			noi di 
+
 			/*******************************************************************
 			HFC CHECK #1: SUBMISSION DETAILS AND CONSENT RATES
 			*******************************************************************/
@@ -224,24 +248,29 @@
 			foreach enum in `enum_itc' {
 				levelsof `enum_name' if `enum_id' == `enum', loc(name) clean
 				
-				count if `enum_id' == `enum' & hfc
+				count if `enum_id' == `enum' & hfc & !mi(key) 
 				loc day_sub `r(N)'
 				
-				count if `enum_id' == `enum'
+				count if `enum_id' == `enum' & !mi(key)
 				loc all_sub `r(N)'
 				
-				su respondent_agree if `enum_id' == `enum'
-				loc consent_rate = `r(mean)' * 100
-				loc consent_rate: di %3.0f `consent_rate'
+				if `all_sub' > 0 {
+					su respondent_agree if `enum_id' == `enum' & !mi(key)
+					loc consent_rate = `r(mean)' * 100
+					loc consent_rate: di %3.0f `consent_rate'
 				
-				su audio_consent if respondent_agree & `enum_id' == `enum'
-				loc ac_rate = `r(mean)' * 100
-				loc ac_rate: di %3.0f `consent_rate'
-
+					su audio_consent if respondent_agree & `enum_id' == `enum' & !mi(key)
+					loc ac_rate = `r(mean)' * 100
+					loc ac_rate: di %3.0f `consent_rate'
+				}
+				
+				else {
+					loc consent_rate "0"
+					loc ac_rate "0"
+				}
 				
 				noi di "`enum'" _column(15) "`name'" _column(50) "`day_sub'" _column(62) ///
 					"`all_sub'" _column(72) "`ac_rate'%" _column(82) "`consent_rate'%"
-				* noi di _dup(90) "."
 			}
 			
 			* drop unneeded macros
@@ -257,7 +286,7 @@
 			noi di  
 			
 			* Check that there are duplicates with this team
-			count if dup & team_id == `team'
+			count if dup & team_id == `team' & !mi(key)
 			if `r(N)' == 0 {
 				noi di "Congratulations, Your Team has no duplicates on `id'"
 			}
@@ -266,7 +295,7 @@
 			else {		
 				noi di in red "There are `r(N)' duplicates on `id', details are as follows"
 				sort `id' `dispvars' `enum_name'
-				noi l skey `enumvars' `id' `dispvars' if dup & team_id == `team', noo sepby(`id') abbrev(32)	
+				noi l skey `enumvars' `id' `dispvars' if dup & team_id == `team' & !mi(key), noo sepby(`id') abbrev(32)	
 			}
 			
 			/*******************************************************************
@@ -279,7 +308,7 @@
 			noi di  
 			
 			* Get the latest form version used on submission date of interest
-			su formdef_version if hfc
+			su formdef_version if hfc & !mi(key)
 			loc form_vers `r(max)'
 			
 			* Check that all members are using the right form and display congrats
@@ -303,12 +332,12 @@
 				levelsof `enum_id' if formdef_version != `form_vers' & team_id == `team' & hfc, loc (enum_rfv) clean
 				foreach enum in `enum_rfv' {
 					levelsof `enum_name' if `enum_id' == `enum', loc (name) clean
-					levelsof formdef_version if `enum_id' == `enum' & formdef_version != `form_version' & hfc, loc (form_version) clean
+					levelsof formdef_version if `enum_id' == `enum' & formdef_version != `form_version' & hfc & !mi(key), loc (form_version) clean
 					
 					noi di "`enum'" _column(10) "`name'" _column(35) "`form_version'"
 				}
 			}	
-		
+			
 			/*******************************************************************
 			HFC CHECK #4: CHECK SURVEY DATES
 			Check that survey dates fall with reasonable minimum and maximum dates
@@ -330,7 +359,7 @@
 				loc survey_end = date("`sedate'", "DM20Y")
 				
 				* Generate a dummy var = 1 if date for observation is valid
-				gen valid_date = start_date >= `survey_start' & end_date <= `survey_end'
+				gen valid_date = (start_date >= `survey_start' & end_date <= `survey_end') & !mi(key)
 			}
 			
 			* Count the number of obs in team with invalid dates. Display messages
@@ -343,26 +372,27 @@
 			else {
 				noi di in red "Some interview dates are outside the expected range `ssdate' and `sedate', details: "
 				sort `enum_id'
-				noi l skey `enumvars' `id' `dispvars' startdate_str enddate_str if !valid_date & team_id == `team', noo sepby(`enum_id')	abbrev(32)
+				noi l skey `enumvars' `id' `dispvars' startdate_str enddate_str if !valid_date & team_id == `team' & !mi(key), ///
+					noo sepby(`enum_id')	abbrev(32)
 			}
-
+			
 			/*******************************************************************
 			HFC CHECK #5: DURATION OF SURVEY
 			*******************************************************************/
 			noi di
 			noi check_headers, checknu("5") checkna("DURATION OF SURVEY")
 			noi di  
-			
+
 			* Check that var valid_dur exist. If no create var
 			if `team' == 0 {
-				su duration
+				su duration if !mi(key)
 				loc dur_mean = floor(`r(mean)')
 				loc valid_dur = `dur_mean' - 60
-				gen valid_duration = duration >= `valid_dur'
+				gen valid_duration = duration >= `valid_dur' & !mi(key)
 			}
 			
-			* Count the number of obs in team with invalid duration and display congrats
-			count if !valid_duration & hfc & team_id == `team'
+			* Count the number of obs in team with invalid duration
+			count if !valid_duration & hfc & team_id == `team' & !mi(key)
 			if `r(N)' == 0 {
 				noi di "{p} Congratulations, all members of your team administered " ///
 						"their surveys within an acceptable duration. "				///
@@ -373,9 +403,9 @@
 			else {
 				sort `enum_id'
 				noi di in red "Durations for the following surveys are too short, average time per survey is `dur_mean' minutes"
-				noi l skey `enumvars' `id' `dispvars' duration if !valid_dur & team_id == `team' & hfc, noo sepby(`enum_id')	abbrev(32)				
+				noi l skey `enumvars' `id' `dispvars' duration if !valid_dur & team_id == `team' & hfc & !mi(key), noo sepby(`enum_id')	abbrev(32)				
 			}	
-			stop
+			
 			/*******************************************************************
 			HFC CHECK #6: SOFT CONSTRAINT VIOLATIONS
 			*******************************************************************/
@@ -400,7 +430,7 @@
 					}
 					loc con_v: list con_v - cv_omit
 					destring `con_v', replace
-					loc cnt_v: word count of `con_v'
+					loc cnt_v = wordcount("`con_v'")
 				
 					* Check that the soft minimum value is a number
 					cap confirm n `con_`i'_sn'
@@ -419,7 +449,7 @@
 					else {
 						unab con_n: `con_`i'_sn'
 						destring `con_n', replace
-						loc cnt_n: word count of `con_n'
+						loc cnt_n = wordcount("`con_n'")
 					
 						if `cnt_n' == 1 {
 							foreach v in `con_v' {
@@ -455,7 +485,7 @@
 					else {
 						unab con_x: `con_`i'_sx'
 						destring `con_x', replace
-						loc cnt_x: word count of `con_x'
+						loc cnt_x = wordcount("`con_x'")
 					
 						if `cnt_x' == 1 {
 							foreach v in `con_v' {
@@ -482,7 +512,7 @@
 			if _rc == 111 {
 				unab c_omit: *_sf *_ok
 			}
-			
+			* set trace on
 			forval i = 1/`v_cnt' {
 				unab con_v: `con_`i'_var'
 				loc con_v: list con_v - c_omit
@@ -491,15 +521,54 @@
 					if _rc {
 						gen `var'_ok = 0
 					}
-					count if `var'_sf & team_id == `team' & !`var'_ok
+					count if `var'_sf & team_id == `team' & !`var'_ok & !mi(key)
 					loc c_trg `r(N)'
 					if `c_trg' > 0 {
+					
+						* check if minimum constraint is a var. If yes list value of var as well
+						cap confirm n `con_`i'_sn'
+						if !_rc {
+							loc mndv ""
+						}
+						
+						else if _rc == 7 {
+							unab mndv_check: `con_`i'_sn'
+							loc mndv_cnt = wordcount("`mndv_check'")
+							if `mndv_cnt' == 1 {
+								loc mndv "`con_`i'_sn'"
+							}
+							
+							else if `mndv_cnt' > 1 {
+								loc mndv_it = substr("`var'", -(strpos(reverse("`var'"), "_")), .)
+								loc mndv = subinstr("`var'", "*", "", .) + "_`mndv_it'"
+							}
+						}
+						
+						* check if maximum constraint is a var. If yes list value of var as well
+						cap confirm n `con_`i'_sx'
+						if !_rc {
+							loc mxdv ""
+						}
+						
+						else if _rc == 7 {
+							unab mndv_check: `con_`i'_sx'
+							loc mndv_cnt = wordcount("`mndv_check'")
+							if `mndv_cnt' == 1 {
+								loc mxdv "`con_`i'_sx'"
+							}
+							
+							else if `mndv_cnt' > 1 {
+								loc mxdv_it = substr("`var'", -(strpos(reverse("`var'"), "_")), .)
+								loc mxdv = subinstr("`var'", "*", "", .) + "_`mndv_it'"
+							}
+						}
+
 						noi di in red "The following are soft constraint violations on variable `var'"
 						noi di "{synopt: Variable Description: }" "`con_`i'_vlab' {p_end}"
 						noi di "Expected Range	: " _column(18) "`con_`i'_sn' - `con_`i'_sx'"				
 							
 						sort `enum_id'
-						cap noi l skey `enumvars' `id' `dispvars' `var' if `var'_sf & !`var'_ok, noo sepby(`enum_id') abbrev(32)
+						cap noi l skey `enumvars' `id' `dispvars' `var' `mndv' `mxdv' if `var'_sf & !`var'_ok & !mi(key), noo sepby(`enum_id') abbrev(32)
 						loc ++j
 					}
 				}
@@ -518,6 +587,7 @@
 				***************************************************************
 				HARD CONSTRAINT VIOLATIONS
 				****************************************************************/
+				
 				noi di
 				noi check_headers, checknu("7") checkna("HARD CONSTRAINT")
 				noi di  
@@ -530,9 +600,9 @@
 					}
 					loc con_v: list con_v - cv_omit
 					destring `con_v', replace
-					loc cnt_v: word count of `con_v'
-				
-					* Check that the soft minimum value is a number
+					loc cnt_v = wordcount("`con_v'")
+									
+					* Check that the hard minimum value is a number
 					cap confirm n `con_`i'_hn'
 					if !_rc {
 						if `cnt_v' == 1 {
@@ -545,11 +615,11 @@
 							}
 						}
 					}
-				
+					
 					else {
 						unab con_n: `con_`i'_hn'
 						destring `con_n', replace
-						loc cnt_n: word count of `con_n'
+						loc cnt_n = wordcount("`con_n'")
 					
 						if `cnt_n' == 1 {
 							foreach v in `con_v' {
@@ -586,11 +656,11 @@
 					else {
 						unab con_x: `con_`i'_hx'
 						destring `con_x', replace
-						loc cnt_x: word count of `con_x'
+						loc cnt_x = wordcount("`con_x'")
 					
 						if `cnt_x' == 1 {
 							foreach v in `con_v' {
-								gen `v'_hf = `v' > `con_x' & !mi(`v')
+								replace `v'_hf = `v' > `con_x' & !mi(`v')
 							}
 
 						}
@@ -692,7 +762,7 @@
 				noi check_headers, checknu("9") checkna("ALL MISS")
 				noi di  
 				
-				/* Check that no variable has only missing alues
+				* Check that no variable has only missing alues
 				loc am 0
 				foreach var of varlist _all {
 					cap assert mi(`var')
@@ -720,15 +790,12 @@
 							noi di "{synopt:`var'}" "`var_lab' {p_end}"
 						}					
 					}
-				}
-				
-				*/
-				
+				}	
 			}
 		}
 		
 		log close
-				
+		stop		
 		/**********************************************************************
 		Check 10:
 		SKIPTRACE

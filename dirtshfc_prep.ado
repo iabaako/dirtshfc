@@ -173,7 +173,7 @@
 		
 		* Merge in enum_data 
 		merge m:1 `enum_id' using "`enum_data'", nogen
-	
+		
 		replace `enum_name' = enum_name_keep
 		drop enum_name_keep
 		
@@ -211,7 +211,7 @@
 		* First, remove excess repeat groups
 		* Second, remove values in repeat groups that are not really needed
 		***********************************************************************/
-		drop if mi(key)
+
 		save "`saving'", replace
 		* Import data from imports sheet
 		import exc using "`enumdetails'", sh(repeats) case(l) first clear
@@ -299,7 +299,6 @@
 		***********************************************************************/
 		
 		* drop empty observations
-		drop if mi(key)
 		save "`saving'", replace
 		
 		/***********************************************************************

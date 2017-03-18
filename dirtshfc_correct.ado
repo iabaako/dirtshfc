@@ -69,7 +69,7 @@
 			if !_rc {
 				* Save constarint vars in a local
 				import exc using "`corrfile'", sh(constraints) case(l) first clear
-				tostring rtype == "`rtype'"
+				tostring rtype, replace
 				keep if rtype == "`rtype'" 
 				levelsof variable, loc (vars) clean
 				
