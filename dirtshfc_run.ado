@@ -51,15 +51,22 @@
 			noi di as err "dirtshfc_prep: SYNTAX ERROR!! Specify r1d1, r1d2 or r2 with type"
 			exit 601
 		}
-
+		
 		if "`rtype'" == "r1d1" {
 			loc logopt "replace"
+			loc r_dsp "RESPONDENT 1/DAY 1"
+		}
+		
+		else if "`rtype'" == "r1d2" {
+			loc logopt "append"
+			loc r_dsp "RESPONDENT 1/DAY 2"
 		}
 		
 		else {
 			loc logopt "append"
+			loc r_dsp "RESPONDENT 2"
 		}
-		
+
 		* Get the enumerator related vars from arg enumvars
 		token `enumvars'
 		loc enum_id "`1'"				// Enumerator ID
@@ -95,7 +102,7 @@
 		***********************************************************************/			
 		* Import sheets containing constraint values
 		import exc using "`enumdetails'", sh(constraints) case(l) first clear
-		
+		keep if rtype == "`rtype'"
 		count if !mi(variable)
 		loc v_cnt `r(N)'
 		
@@ -116,7 +123,8 @@
 		***********************************************************************/			
 		* Import sheets nomiss variables
 		import exc using "`enumdetails'", sh(nomiss) case(l) first clear
-		drop if mi(variable)
+		replace rtype = lower(rtype)
+		keep if rtype == "`rtype'" | "`rtype'" == "all"
 		count if !mi(variable)
 		loc n_cnt `r(N)'
 		
@@ -150,7 +158,7 @@
 		if _rc == 601 {
 			mkdir "`logfolder'/`date'"
 		}
-	
+		
 		/***********************************************************************
 		HIGH FREQUENCY CHECKS
 		
@@ -167,7 +175,7 @@
 			
 			if `team' == 0 {
 				use "`saving'", clear
-				loc team_name "All"
+				loc team_name "ALL"
 				gen team_id_keep = team_id
 				replace team_id = 0
 				
@@ -180,15 +188,16 @@
 				use "`saving'", clear
 				replace team_id = team_id_keep
 				drop team_id_keep
-				loc team_name "`team_`t1''"
+				loc team_name = upper("`team_`t1''")
 			}
 			
 			else {
 				use "`saving'", clear
-				loc team_name "`team_`t1''"
+				loc team_name = upper("`team_`t1''")
 			}
 						
 			* start log
+			
 			cap log close
 			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'", `logopt'
 			
@@ -198,7 +207,9 @@
 			noi di _dup(120) "*"
 	
 			noi di "{bf: HIGH FREQUENCY CHECKS FOR DIRTS ANNUAL SURVEY 2017}"
-			noi di _column(10) "{bf:HFC LOG: TEAM `team_name'}" 
+			noi di 
+			noi di _column(10) "{bf:Respondent/Day:}" _column(30) "{bf:`r_dsp'}"
+			noi di _column(10) "{bf:HFC LOG:}" _column(30) "{bf: TEAM `team_name'}" 
 			noi di
 			noi di "{bf: HFC Date		: `date'}"
 			loc date_f = upper(subinstr("`c(current_date)'", " ", "_", .))
@@ -207,7 +218,6 @@
 			noi di _dup(120) "*"
 			noi di _dup(120) "-"
 			noi di "{hline 120}"
-			
 			
 			/*******************************************************************
 			HFC CHECK #0: SUMMARIES
@@ -363,7 +373,7 @@
 			}
 			
 			* Count the number of obs in team with invalid dates. Display messages
-			count if !valid_date & team_id == `team'
+			count if !valid_date & team_id == `team' & !mi(key)
 			if `r(N)' == 0 {
 				noi di "{p} Congratulations, start and end dates for all surveys are within the expected range of `ssdate' and `sedate' {p_end}"
 			}
@@ -578,6 +588,9 @@
 				noi di "Congratulation, your team has no soft constraint violation"
 			}
 			
+			* Save a copy after first loop
+			save "`saving'", replace
+
 			if `team' == 0 {
 			
 				/***************************************************************
@@ -686,16 +699,55 @@
 						if _rc {
 							gen `var'_ok = 0
 						}
-						count if `var'_hf & team_id == `team' & !`var'_ok
 						
+						count if `var'_hf & team_id == `team' & !`var'_ok & !mi(key)
 						loc c_trg `r(N)'
 						if `c_trg' > 0 {
+						
+							* check if minimum constraint is a var. If yes list value of var as well
+							cap confirm n `con_`i'_hn'
+							if !_rc {
+								loc mndv ""
+							}
+						
+							else if _rc == 7 {
+								unab mndv_check: `con_`i'_hn'
+								loc mndv_cnt = wordcount("`mndv_check'")
+								if `mndv_cnt' == 1 {
+									loc mndv "`con_`i'_hn'"
+								}
+							
+								else if `mndv_cnt' > 1 {
+									loc mndv_it = substr("`con_`i'_hn'", -(strpos(reverse("`var'"), "_")), .)
+									loc mndv = subinstr("`con_`i'_hn'", "*", "", .) + "_`mndv_it'"
+								}
+							}
+						
+							* check if maximum constraint is a var. If yes list value of var as well
+							cap confirm n `con_`i'_hx'
+							if !_rc {
+								loc mxdv ""
+							}
+						
+							else if _rc == 7 {
+								unab mndv_check: `con_`i'_hx'
+								loc mndv_cnt = wordcount("`mndv_check'")
+								if `mndv_cnt' == 1 {
+									loc mxdv "`con_`i'_hx'"
+								}
+							
+								else if `mndv_cnt' > 1 {
+									loc mxdv_it = substr("`var'", -(strpos(reverse("`var'"), "_")), .)
+									loc mxdv = subinstr("`con_`i'_hx'", "*", "", .) + "`mxdv_it'"
+								}
+							}
+							
 							noi di in red "The following are hard constraint violations on variable `var'"
 							noi di "{synopt: Variable Description: }" "`con_`i'_vlab' {p_end}"
 							noi di "Expected Range	: " _column(18) "`con_`i'_hn' - `con_`i'_hx'"				
 							
 							sort `enum_id'
-							cap noi l skey `enumvars' `id' `dispvars' `var' if `var'_hf & !`var'_ok, noo sepby(`enum_id') abbrev(32)
+							cap noi l skey `enumvars' `id' `dispvars' `var' `mndv' `mxdv' if `var'_hf & !`var'_ok & !mi(key), noo sepby(`enum_id') abbrev(32)
 							loc ++j
 						}
 					}
@@ -762,7 +814,7 @@
 				noi check_headers, checknu("9") checkna("ALL MISS")
 				noi di  
 				
-				* Check that no variable has only missing alues
+				/* Check that no variable has only missing alues
 				loc am 0
 				foreach var of varlist _all {
 					cap assert mi(`var')
@@ -790,12 +842,13 @@
 							noi di "{synopt:`var'}" "`var_lab' {p_end}"
 						}					
 					}
-				}	
+				}
+				*/
 			}
 		}
 		
 		log close
-		stop		
+		
 		/**********************************************************************
 		Check 10:
 		SKIPTRACE
@@ -804,15 +857,15 @@
 		***********************************************************************/
 		
 		import exc using "`enumdetails'", sh(skiptrace) case(l) first clear
-		levelsof keepvars, loc (st_kvs) clean
+		levelsof keepvars, loc (keepvars) clean
 		
-		keep if type == "`rtype'"
+		keep if rtype == "`rtype'"
 		count if !mi(variable)
 		loc v_cnt `r(N)'
 		forval i = 1/`v_cnt' {
 			loc trvar_`i' = variable[`i']
 			loc vlab_`i' = var_lab[`i']
-			loc trval_`i' = trace_values[`i']
+			loc trval_`i' = exp_values[`i']
 		}
 		
 		use "`saving'", clear
@@ -833,8 +886,8 @@
 			} 
 		} 
 		
-		keep `st_kvs' `trvars'
-		order `st_kvs'
+		keep `keepvars' `trvars'
+		order `keepvars'
 		destring `trvars', replace
 
 		foreach tv in `trvars' {
@@ -842,57 +895,45 @@
 			replace `tv' = 1 if `tv' == .n
 			bysort `enum_id': egen _tmp = mean(`tv')
 			replace `tv' = _tmp
-			format `tv' %5.2f
+			format `tv' %4.2f
 			drop _tmp
 		}
 	
 		bysort `enum_id': gen n = _n
-		keep if n == 1
+		bysort `enum_id': gen submissions = _N
+		keep if n == 1		
+		order `keepvars' submissions
 		drop n
 		
-		export exc using "`logfolder'/`date'/dirts_hfc_output_`rtype'.xlsx", sh("skiptrace") sheetmod first(var)
+		export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("skiptrace") sheetmod first(var)
 		/**********************************************************************
 		Check 11:
 		MISSING RESPONSE RATE
 		Check the missing responses rate of some questions
 		and export the answeres to a an excel sheet
 		***********************************************************************/
+		
+		import exc using "`enumdetails'", sh(enumdb) case(l) first clear
+		drop miss_*
+		levelsof keepvars, loc (keepvars) clean
+		
+		foreach spec in missing dk ref {
+			replace rtype_`spec' = lower(rtype_`spec') 
+			levelsof exc_var_`spec' if rtype_`spec' == "`rtype'" | rtype_`spec' == "all", loc (exc_var_`spec') clean
+		}
+				
 		use "`saving'", clear
 		cap drop *_sf *_hf *_ok
-		
-		#d;
-		
-		loc exc_vars 
-				`id'
-				`enumvars'
-				`dispvars'
-				respondent_agree
-				audio_consent
-				team_*
-				deviceid
-				submissiondate
-				subdate
-				startdate
-				starttime
-				endtime
-				enddate
-				dur 
-				duration
-				resp_confirm
-				text_audit
-				audio_audit
-				;
-		#d cr
-		
-		ds `exc_vars', not
+
+		ds `exc_var_missing', not
 		loc vars `r(varlist)'
 		loc ms_track 0
 		loc miss_vars ""
 		foreach var in `vars' {
 			* set trace on
-			cap assert !mi(`var')
+			cap assert !mi(`var') & !mi(key)
 			if _rc == 9 {
-				cap assert mi(`var')
+				cap assert mi(`var') & !mi(key)
 				if _rc == 9 {
 					cap confirm str var `var'
 					if _rc == 7 {
@@ -936,14 +977,14 @@
 		
 		if `ms_track' > 0 {
 			bysort `enum_id': gen n = _n
-			bysort `enum_id': gen total_surveys = _N
+			bysort `enum_id': gen submissions = _N
 			keep if n == 1
-			keep `dispvars' team_name `enumvars' total_surveys `miss_vars' 
-			order `dispvars' team_name `enumvars' total_surveys
+			keep `keepvars' submissions `miss_vars' 
+			order `keepvars' submissions
 		
-			export exc using "`logfolder'/`date'/dirts_hfc_output_`rtype'.xlsx", sh("missing_rate") sheetmod first(var) nol
+			export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("missing_rate") sheetmod first(var) nol
 		}
-	
+		
 		/**********************************************************************
 		Check 12:
 		DONT KNOW RESPONSE RATE
@@ -955,6 +996,8 @@
 		use "`saving'", clear
 		cap drop *_sf *_hf *_ok
 		
+		ds `exc_var_dk', not
+		loc vars `r(varlist)'
 		loc track_nm 0
 		foreach var in `vars' {
 			* set trace on
@@ -999,12 +1042,12 @@
 		
 		if `track_nm' > 0 {
 			bysort `enum_id': gen n = _n
-			bysort `enum_id': gen total_surveys = _N
+			bysort `enum_id': gen submissions = _N
 			keep if n == 1
-			keep `dispvars' team_name `enumvars' total_surveys `rate_vars'
-			order `dispvars' team_name `enumvars' total_surveys
+			keep `keepvars' submissions `rate_vars'
+			order `keepvars' submissions
 			
-			export exc using "`logfolder'/`date'/dirts_hfc_output_`rtype'.xlsx", sh("dontknow_rate") sheetmod first(var) nol
+			export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("dontknow_rate") sheetmod first(var) nol
 		}
 		
 
@@ -1018,6 +1061,7 @@
 		use "`saving'", clear
 		cap drop *_sf *_hf *_ok
 		
+		ds `exc_var_ref', not
 		loc track_nm 0
 		loc rate_vars ""
 		foreach var in `vars' {
@@ -1063,14 +1107,35 @@
 		
 		if `track_nm' > 0 {
 			bysort `enum_id': gen n = _n
-			bysort `enum_id': gen total_surveys = _N
+			bysort `enum_id': gen submissions = _N
 			keep if n == 1
-			keep `dispvars' team_name `enumvars' total_surveys `rate_vars'
-			order `dispvars' team_name `enumvars' total_surveys
+			keep `keepvars' submissions `rate_vars'
+			order `keepvars' submissions
 		
-			export exc using "`logfolder'/`date'/dirts_hfc_output_`rtype'.xlsx", sh("refusal_rate") sheetmod first(var) nol
+			export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("refusal_rate") sheetmod first(var) nol
 		}
+		
+		
+		/**********************************************************************
+		Check 14:
+		SURVEY DURATIONS
+		***********************************************************************/
+		
+		use "`saving'", clear
+		cap drop *_sf *_hf *_ok
 
+		keep if !mi(key)
+		keep `keepvars' `enum_id' `enum_name' duration
+		
+		bysort `enum_id': egen mean_dur = mean(duration)
+		bysort `enum_id': gen n = _n
+		bysort `enum_id': gen submissions = _N
+		keep if n == 1
+		replace duration = mean_dur
+		drop n mean_dur
+		order `keepvars' submission duration
+				
+		export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("duration") sheetmod first(var) nol
 	}
 	
 	
