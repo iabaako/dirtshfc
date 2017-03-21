@@ -814,7 +814,7 @@
 				noi check_headers, checknu("9") checkna("ALL MISS")
 				noi di  
 				
-				/* Check that no variable has only missing alues
+				* Check that no variable has only missing alues
 				loc am 0
 				foreach var of varlist _all {
 					cap assert mi(`var')
@@ -843,7 +843,6 @@
 						}					
 					}
 				}
-				*/
 			}
 		}
 		
@@ -858,6 +857,7 @@
 		
 		import exc using "`enumdetails'", sh(skiptrace) case(l) first clear
 		levelsof keepvars, loc (keepvars) clean
+		replace rtype = lower(rtype)
 		
 		keep if rtype == "`rtype'"
 		count if !mi(variable)
