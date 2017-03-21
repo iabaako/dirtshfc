@@ -24,13 +24,13 @@ qui {
 
 	* Set the neccesary directories
 
-	gl main 	"../08_HFC"									// Main Folder
-	gl logs 	"$main/01_hfc_logs/02_field_pilot/02"		// Log Folder
-	gl csv 		"$main/02_scto_csv/02_field_pilot/02"		// SCTO csv folder
-	gl dta 		"$main/03_scto_dta/02_field_pilot/02"		// SCTO dta folder
-	gl reserve	"$main/00_reserve"							// reserve folder
-	gl audio	"$main/04_scto_ren_audio02_field_pilot/02"  // Audio Folder
-	gl backup 	"X:/Box.net/Data Backup/DIRTS Annual 2017/`hfcdate'"
+	gl main 	"../08_HFC"												// Main Folder
+	gl logs 	"$main/01_hfc_logs/02_field_pilot/02"					// Log Folder
+	gl csv 		"$main/02_scto_csv/02_field_pilot/02"					// SCTO csv folder
+	gl dta 		"$main/03_scto_dta/02_field_pilot/02"					// SCTO dta folder
+	gl reserve	"$main/00_reserve"										// reserve folder
+	gl audio	"$main/04_scto_ren_audio/02_field_pilot/02"  			// Audio Folder
+	gl backup 	"X:/Box.net/Data Backup/DIRTS Annual 2017/`hfcdate'"	// backup folder
 	
 }
 
@@ -166,7 +166,7 @@ foreach r in r1d1 r1d2 r2 {
 			by(dist_name team_name)
 			id(fprimary)
 			enum(researcher_id)
-			from("$csv/`r'/media")
+			from("$csv/media")
 			to("$audio")
 			reso(skey)
 		;
