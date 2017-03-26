@@ -903,6 +903,8 @@
 		bysort `enum_id': gen submissions = _N
 		keep if n == 1		
 		order `keepvars' submissions
+		sort team_id submissions
+		
 		drop n
 		
 		export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("skipcontrol_rate") sheetmod first(var)
@@ -924,6 +926,7 @@
 				
 		use "`saving'", clear
 		cap drop *_sf *_hf *_ok
+		drop hfc dup start_date end_date valid_date valid_duration
 
 		ds `exc_var_missing', not
 		loc vars `r(varlist)'
@@ -981,7 +984,8 @@
 			keep if n == 1
 			keep `keepvars' submissions `miss_vars' 
 			order `keepvars' submissions
-		
+			sort team_id submissions
+			
 			export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("missing_rate") sheetmod first(var) nol
 		}
 		
@@ -1046,6 +1050,7 @@
 			keep if n == 1
 			keep `keepvars' submissions `rate_vars'
 			order `keepvars' submissions
+			sort team_id submissions
 			
 			export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("dontknow_rate") sheetmod first(var) nol
 		}
@@ -1111,6 +1116,7 @@
 			keep if n == 1
 			keep `keepvars' submissions `rate_vars'
 			order `keepvars' submissions
+			sort team_id submissions
 		
 			export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("refusal_rate") sheetmod first(var) nol
 		}
@@ -1133,7 +1139,8 @@
 		keep if n == 1
 		replace duration = mean_dur
 		drop n mean_dur
-		order `keepvars' submission duration
+		order `keepvars' submissions duration
+		sort team_id submissions
 				
 		export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("duration") sheetmod first(var) nol
 	}
