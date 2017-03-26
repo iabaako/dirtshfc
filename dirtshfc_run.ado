@@ -1,4 +1,4 @@
-*! version 0.0.3 Ishmail Azindoo Baako (IPA) Jan, 2016
+*! version 1.0.0 Ishmail Azindoo Baako (IPA) March, 2016
 
 /* 
 	This stata program is part of the HFC for the DIRTS Annual Survey 2017. 
@@ -850,12 +850,12 @@
 		
 		/**********************************************************************
 		Check 10:
-		SKIPTRACE
+		SKIPCONTROL RATE
 		Check the responses to some questions
 		and export the answeres to a an excel sheet
 		***********************************************************************/
 		
-		import exc using "`enumdetails'", sh(skiptrace) case(l) first clear
+		import exc using "`enumdetails'", sh(skipcontrol) case(l) first clear
 		levelsof keepvars, loc (keepvars) clean
 		replace rtype = lower(rtype)
 		
@@ -905,7 +905,7 @@
 		order `keepvars' submissions
 		drop n
 		
-		export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("skiptrace") sheetmod first(var)
+		export exc using "`logfolder'/`date'/dirts_hfc_enumdb_`rtype'.xlsx", sh("skipcontrol_rate") sheetmod first(var)
 		/**********************************************************************
 		Check 11:
 		MISSING RESPONSE RATE
