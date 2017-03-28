@@ -115,7 +115,7 @@
 			loc con_`i'_sn = soft_min[`i']
 			loc con_`i'_sx = soft_max[`i']
 			loc con_`i'_hx = hard_max[`i']
-			
+			loc con_`i'_sh = show_var[`i']
 		}
 		
 		/**********************************************************************
@@ -319,32 +319,33 @@
 			
 			* Get the latest form version used on submission date of interest
 			su formdef_version if hfc & !mi(key)
-			loc form_vers `r(max)'
+			loc form_vers: di %11.0f `r(max)'
 			
 			* Check that all members are using the right form and display congrats
 			cap assert formdef_version == `form_vers' if team_id == `team' & hfc
 			if !_rc {
 				noi di "Congratulations, all team members are using the latest form version for `date'" 
-				noi di "Form Version for `date': " as res "`form_vers'"
+				noi di "Form Version for `date': `form_vers'"
 			}
-			
 			
 			* Display form version details if enum is using the wrong for
 			else {
 				* Display message and column titles
 				noi di in red "Some members of your team may have used the wrong form version for `date'" 
 				noi di
-				noi di in red "Form Version for `date': " as res `form_vers'	
+				noi di in red "Form Version for `date': `form_vers'"	
+				noi di
 				
-				noi di  "`enum_id'" _column(10)  "`enum_name'" _column(35)  "form_version"
+				noi di in green "`enum_id'" _column(15)  "`enum_name'" _column(45)  "form_version"
 
 				* For each enumerator in team with wrong form version, display the id, name and form version used
-				levelsof `enum_id' if formdef_version != `form_vers' & team_id == `team' & hfc, loc (enum_rfv) clean
+				levelsof `enum_id' if formdef_version != `form_vers' & team_id == `team' & hfc & !mi(key), loc (enum_rfv) clean
 				foreach enum in `enum_rfv' {
 					levelsof `enum_name' if `enum_id' == `enum', loc (name) clean
-					levelsof formdef_version if `enum_id' == `enum' & formdef_version != `form_version' & hfc & !mi(key), loc (form_version) clean
+					levelsof formdef_version if `enum_id' == `enum' & formdef_version != `form_vers' & hfc & !mi(key), loc (form_version) clean
+					loc form_version: di %11.0f `form_version'
 					
-					noi di "`enum'" _column(10) "`name'" _column(35) "`form_version'"
+					noi di "`enum'" _column(15) "`name'" _column(45) "`form_version'"
 				}
 			}	
 			
@@ -531,6 +532,7 @@
 					if _rc {
 						gen `var'_ok = 0
 					}
+					
 					count if `var'_sf & team_id == `team' & !`var'_ok & !mi(key)
 					loc c_trg `r(N)'
 					if `c_trg' > 0 {
@@ -572,13 +574,31 @@
 								loc mxdv = subinstr("`var'", "*", "", .) + "_`mndv_it'"
 							}
 						}
+						
+						* Check if a variable was specified in column show_var and list the variable 
+						if "`con_`i'_sh'" != "" {
+							if substr("`con_`i'_sh'", -1, .) == "*" {
+								loc subin = subinstr("`con_`i'_var'", "*", "", .) 
+								loc shv_it = subinstr("`var'", "`subin'", "", .)
+								loc show_var = subinstr("`con_`i'_sh'", "*", "", .) + "`shv_it'"
+								cap confirm var `show_var'
+								if _rc == 111 {
+									loc shv_it = substr("`var'", -(strpos(reverse("`var'"), "_")), .)
+									loc show_var = subinstr("`con_`i'_sh'", "*", "", .) + "`shv_it'"
+								}
+							}
+							
+							else {
+								loc show_var "`con_`i'_sh'"
+							}
+						} 
 
 						noi di in red "The following are soft constraint violations on variable `var'"
 						noi di "{synopt: Variable Description: }" "`con_`i'_vlab' {p_end}"
 						noi di "Expected Range	: " _column(18) "`con_`i'_sn' - `con_`i'_sx'"				
 							
 						sort `enum_id'
-						cap noi l skey `enumvars' `id' `dispvars' `var' `mndv' `mxdv' if `var'_sf & !`var'_ok & !mi(key), noo sepby(`enum_id') abbrev(32)
+						cap noi l skey `enumvars' `id' `dispvars' `show_var' `var' `mndv' `mxdv' if `var'_sf & !`var'_ok & !mi(key), noo sepby(`enum_id') abbrev(32)
 						loc ++j
 					}
 				}
