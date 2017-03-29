@@ -199,7 +199,7 @@
 			* start log
 			
 			cap log close
-			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'", `logopt'
+			log using "`logfolder'/`date'/dirtshfc_log_TEAM_`team_name'", `logopt' text
 			
 			* Create Header
 			noi di "{hline 120}"
