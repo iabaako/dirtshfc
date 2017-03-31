@@ -318,36 +318,43 @@
 			noi di  
 			
 			* Get the latest form version used on submission date of interest
-			su formdef_version if hfc & !mi(key)
-			loc form_vers: di %11.0f `r(max)'
+			count if hfc & !mi(key)
+			if `r(N)' > 0 {
+				su formdef_version if hfc & !mi(key)
+				loc form_vers: di %11.0f `r(max)'
 			
-			* Check that all members are using the right form and display congrats
-			cap assert formdef_version == `form_vers' if team_id == `team' & hfc
-			if !_rc {
-				noi di "Congratulations, all team members are using the latest form version for `date'" 
-				noi di "Form Version for `date': `form_vers'"
+				* Check that all members are using the right form and display congrats
+				cap assert formdef_version == `form_vers' if team_id == `team' & hfc
+				if !_rc {
+					noi di "Congratulations, all team members are using the latest form version for `date'" 
+					noi di "Form Version for `date': `form_vers'"
+				}
+			
+				* Display form version details if enum is using the wrong for
+				else {
+					* Display message and column titles
+					noi di in red "Some members of your team may have used the wrong form version for `date'" 
+					noi di
+					noi di in red "Form Version for `date': `form_vers'"	
+					noi di
+				
+					noi di in green "`enum_id'" _column(15)  "`enum_name'" _column(45)  "form_version"
+
+					* For each enumerator in team with wrong form version, display the id, name and form version used
+					levelsof `enum_id' if formdef_version != `form_vers' & team_id == `team' & hfc & !mi(key), loc (enum_rfv) clean
+					foreach enum in `enum_rfv' {
+						levelsof `enum_name' if `enum_id' == `enum', loc (name) clean
+						levelsof formdef_version if `enum_id' == `enum' & formdef_version != `form_vers' & hfc & !mi(key), loc (form_version) clean
+						loc form_version: di %11.0f `form_version'
+					
+						noi di "`enum'" _column(15) "`name'" _column(45) "`form_version'"
+					}
+				}
 			}
 			
-			* Display form version details if enum is using the wrong for
 			else {
-				* Display message and column titles
-				noi di in red "Some members of your team may have used the wrong form version for `date'" 
-				noi di
-				noi di in red "Form Version for `date': `form_vers'"	
-				noi di
-				
-				noi di in green "`enum_id'" _column(15)  "`enum_name'" _column(45)  "form_version"
-
-				* For each enumerator in team with wrong form version, display the id, name and form version used
-				levelsof `enum_id' if formdef_version != `form_vers' & team_id == `team' & hfc & !mi(key), loc (enum_rfv) clean
-				foreach enum in `enum_rfv' {
-					levelsof `enum_name' if `enum_id' == `enum', loc (name) clean
-					levelsof formdef_version if `enum_id' == `enum' & formdef_version != `form_vers' & hfc & !mi(key), loc (form_version) clean
-					loc form_version: di %11.0f `form_version'
-					
-					noi di "`enum'" _column(15) "`name'" _column(45) "`form_version'"
-				}
-			}	
+				noi di "No submissions on `date'. Skipping this check"
+			}
 			
 			/*******************************************************************
 			HFC CHECK #4: CHECK SURVEY DATES
