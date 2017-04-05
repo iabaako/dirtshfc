@@ -1,4 +1,4 @@
-*! version 1.0.0 Ishmail Azindoo Baako (IPA) March, 2016
+*! version 1.0.1 Ishmail Azindoo Baako (IPA) March, 2016
 
 /* 
 	This stata program is part of the HFC for the DIRTS Annual Survey 2017. 
@@ -15,6 +15,9 @@
 	dispvars	: Variables to display at hh level excluding the hhid
 	logfolder	: Name of folder were logfiles are saved
 	saving		: Name for saving data after hfc is run
+
+
+	version 1.0.1: Fixed issue with undisaggregated constraint report
 
 */	
 	prog def dirtshfc_run
@@ -605,7 +608,7 @@
 						noi di "Expected Range	: " _column(18) "`con_`i'_sn' - `con_`i'_sx'"				
 							
 						sort `enum_id'
-						cap noi l skey `enumvars' `id' `dispvars' `show_var' `var' `mndv' `mxdv' if `var'_sf & !`var'_ok & !mi(key), noo sepby(`enum_id') abbrev(32)
+						cap noi l skey `enumvars' `id' `dispvars' `show_var' `var' `mndv' `mxdv' if `var'_sf & !`var'_ok & !mi(key) & team_id == `team', noo sepby(`enum_id') abbrev(32)
 						loc ++j
 					}
 				}
