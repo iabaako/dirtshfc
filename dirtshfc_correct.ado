@@ -57,9 +57,15 @@
 		import exc using "`corrfile'", sh(corrections) case(l) first clear
 		tostring rtype, replace
 		keep if rtype == "`rtype'"
-		count if !mi(skey)
+		
+		* Trim all string vars
+		ds, has(type string)
+		foreach vtt in `r(varlist)' {
+			replace `vtt' = trim(`vtt')
+		}
 		
 		* Check that the dataset contains some data. If not skip correctiosn
+		count if !mi(skey)
 		if `r(N)' == 0 {
 			noi di in green "dirtshfc_correct: Hurray!! No need for corrections for survey `rtype'"
 			
@@ -131,7 +137,7 @@
 			}
 		
 			cap log close
-			log using "`logfile'.smcl", replace 
+			log using "`logfile'_`rtype'", replace text 
 			
 			
 			* Create Header
@@ -140,7 +146,7 @@
 			noi di _dup(82) "*"
 	
 			noi di "{bf: HIGH FREQUENCY CHECKS FOR DIRTS ANNUAL SURVEY 2017}"
-			noi di _column(10) "{bf:CORRECTIONS LOG}" 
+			noi di _column(10) "{bf:CORRECTIONS LOG - `rtype'}" 
 			noi di
 			noi di "{bf: Date: `c(current_date)'}"
 	
@@ -158,14 +164,14 @@
 			
 				use `corr_data', clear
 			
-				noi di "{bf: Marked `hfc_okay' flagged issues as okay, Details are as follows:}"
+				noi di "{bf: Marking `hfc_okay' flagged issues as okay, Details are as follows:}"
 				noi di
-				noi di "s_key" _column(15) "`id'" _column(30) "variable" _column(60) "value"
+				noi di "skey" _column(15) "`id'" _column(30) "variable" _column(60) "value"
 				noi di "{hline 82}"
 				
 				keep if action == 0
 				
-				* Save s_keys, id, variable names and values in locals
+				* Save skeys, id, variable names and values in locals
 				forval i = 1/`hfc_okay' {
 					loc skey_`i' = skey[`i']
 					loc `id'_`i' = `id'[`i']
@@ -221,7 +227,7 @@
 			save "`saving'", replace
 	
 			noi di
-			
+	
 			/*******************************************************************
 			Drop Observations. Drop observations that have been marked in the 
 			correction sheet to be dropped
@@ -277,13 +283,13 @@
 			if `hfc_rep' > 0 {
 				use `corr_data', clear
 				noi di "{bf: Replaced `hfc_rep' flagged issues, Details are as follows:}"
-				noi di "skey" _column(15) "`id'" _column(30) "variable" _column(55) "value" _column(65) "new_value" 
+				noi di "skey" _column(15) "`id'" _column(30) "variable" _column(60) "value" _column(70) "new_value" 
 				noi di "{hline 82}"
 				
 				keep if action == 2
 				
 				* set trace on
-				* Save s_keys, hhids, variable names and values in locals
+				* Save skeys, hhids, variable names and values in locals
 				forval i = 1/`hfc_rep' {
 					loc skey_`i' = skey[`i']
 					loc `id'_`i' = `id'[`i']
@@ -311,7 +317,7 @@
 				
 					cap confirm string var `variable_`i'' 
 					if !_rc {
-						replace `variable_`i'' = "`new_value_`i''" if s_key == "`skey_`i''" & `id' == "``id'_`i''" ///
+						replace `variable_`i'' = "`new_value_`i''" if skey == "`skey_`i''" & `id' == "``id'_`i''" ///
 							& `variable_`i'' == "`value_`i''"
 					}
 					
@@ -321,7 +327,7 @@
 					}
 						
 					noi di "`skey_`i''" _column(15) "``id'_`i''" _column(30) "`variable_`i''" ///
-						_column(55) "`value_`i''" _column(65) "`new_value_`i''"
+						_column(60) "`value_`i''" _column(70) "`new_value_`i''"
 				}
 			}
 		}

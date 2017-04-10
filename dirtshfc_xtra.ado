@@ -21,8 +21,7 @@
 	prog def dirtshfc_err_rates
 	
 		syntax varname using/,
-		BCSheet(string)
-		WEIGHTSHeet(string)
+		INPUTSheet(string)
 		ENUMVars(varname min=2 max=2)
 		BCERVars(varname min=2 max=2)
 		LOGFile(string)
