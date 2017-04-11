@@ -21,7 +21,8 @@
 		syntax name using/,			
 		ENUMVars(namelist min=2 max=2)	
 		CORRFile(string)				
-		LOGfile(string)					
+		LOGfile(string)
+		ERRlog(string)
 		SAVing(string)
 		RTYpe(string)
 		;
@@ -49,6 +50,12 @@
 		
 		* Represent the id var with the local id
 		loc id `namelist'
+		
+		* Get the enumerator related vars from arg enumvars
+		token `enumvars'
+		loc enum_id "`1'"				// Enumerator ID
+		loc enum_name "`2'"				// Enumerator Name
+
 		
 		/***********************************************************************
 		Import corrections file details and save it in a tempfile
@@ -118,16 +125,27 @@
 			loc hfc_rep `r(N)'
 			
 			save `corr_data'
-		
+
 			/*******************************************************************
 			Import the SCTO generated dataset. This dataset is what is created 
 			after dirtshfc_prep.ado is runned
 		    ******************************************************************/
-	
+			* Import correction sheet
+			import exc using "`corrfile'", sh(constraints) case(l) first clear
+			tostring rtype, replace
+			keep if rtype == "`rtype'" 
+			levelsof variable, loc (vars) clean
+
 			* Confirm that string specified with directory is an actual directory
 			cap confirm file "`using'"
 			if !_rc {
 				use "`using'", clear
+				* Mark all vars as not okay 
+				unab vars: `vars'
+				foreach var in `vars' {
+					gen `var'_ok = 0
+				}
+
 			}
 			
 			* Throw and error if file does not exist
@@ -166,7 +184,7 @@
 			
 				noi di "{bf: Marking `hfc_okay' flagged issues as okay, Details are as follows:}"
 				noi di
-				noi di "skey" _column(15) "`id'" _column(30) "variable" _column(60) "value"
+				noi di "skey" _column(15) "`id'" _column(30) "variable" _column(60) "value" _column(70) "Result"
 				noi di "{hline 82}"
 				
 				keep if action == 0
@@ -214,8 +232,18 @@
 							& `variable_`i'' == `value_`i''
 					}
 					
-					* Display some details about the var been marked as okay
-					noi di "`skey_`i''" _column(15) "``id'_`i''" _column(30) "`variable_`i''" _column(60) "`value_`i''"
+					* Confirm that var has been marked as okay
+					cap assert `variable_`i''_ok == 1 if skey == "`skey_`i''" & `id' == "``id'_`i''"
+					if !_rc {
+				
+						* Display some details about the var been marked as okay
+						noi di "`skey_`i''" _column(15) "``id'_`i''" _column(30) "`variable_`i''" _column(60) "`value_`i''" _column(70) "Successful"
+					}
+					
+					else if _rc == 9 {
+						noi di "`skey_`i''" _column(15) "``id'_`i''" _column(30) "`variable_`i''" _column(60) "`value_`i''" _column(70) "Failed"
+					}
+					
 				}
 				
 				* drop macros
@@ -236,7 +264,7 @@
 			if `hfc_drop' > 0 {
 				use `corr_data', clear
 				noi di "{bf: Dropped `hfc_drop' observations from the dataset, Details are as follows:}"
-				noi di "skey" _column(15) "`id'"
+				noi di "skey" _column(15) "`id'" _column(30) "Results"
 				noi di "{hline 82}"
 				
 				*keep only observations in corr sheet that will be dropped
@@ -265,7 +293,15 @@
 					}
 
 					drop if skey == "`skey_`i''" & `id' == "``id'_`i''"
-					noi di "`skey_`i''" _column(15) "``id'_`i''"
+					
+					cap assert skey != "`skey_`i''"
+					if !_rc {
+						noi di "`skey_`i''" _column(15) "``id'_`i''" _column(30) "Succesful"
+					}
+					
+					else if _rc == 9 {
+						noi di "`skey_`i''" _column(15) "``id'_`i''" _column(30) "Failed"
+					}
 				}
 				
 				* drop macros
@@ -283,7 +319,7 @@
 			if `hfc_rep' > 0 {
 				use `corr_data', clear
 				noi di "{bf: Replaced `hfc_rep' flagged issues, Details are as follows:}"
-				noi di "skey" _column(15) "`id'" _column(30) "variable" _column(60) "value" _column(70) "new_value" 
+				noi di "skey" _column(15) "`id'" _column(30) "variable" _column(60) "value" _column(70) "new_value" _column(80) "Result"
 				noi di "{hline 82}"
 				
 				keep if action == 2
@@ -314,20 +350,38 @@
 						noi di as err "dirtshfc_correct: Wrong `id'(``id'_`i'') specified in correction sheet"
 						exit 9
 					}
-				
+					
+					loc true 0
 					cap confirm string var `variable_`i'' 
 					if !_rc {
 						replace `variable_`i'' = "`new_value_`i''" if skey == "`skey_`i''" & `id' == "``id'_`i''" ///
 							& `variable_`i'' == "`value_`i''"
+						
+						cap assert `variable_`i'' == "`new_value_`i''" if skey == "`skey_`i''" & `id' == "``id'_`i''"
+						if !_rc {
+							loc true 1
+						}
 					}
 					
 					else {
 						replace `variable_`i'' = `new_value_`i'' if skey == "`skey_`i''" & `id' == "``id'_`i''" ///
 							& `variable_`i'' == `value_`i''
+							
+						cap assert `variable_`i'' == `new_value_`i'' if skey == "`skey_`i''" & `id' == "``id'_`i''"
+						if !_rc {
+							loc true 1
+						}
 					}
-						
-					noi di "`skey_`i''" _column(15) "``id'_`i''" _column(30) "`variable_`i''" ///
-						_column(60) "`value_`i''" _column(70) "`new_value_`i''"
+					
+					if `true' == 1 {
+						noi di "`skey_`i''" _column(15) "``id'_`i''" _column(30) "`variable_`i''" ///
+							_column(60) "`value_`i''" _column(70) "`new_value_`i''" _column(80) "Successful"
+					}
+					
+					else if `true' == 0 {
+						noi di "`skey_`i''" _column(15) "``id'_`i''" _column(30) "`variable_`i''" ///
+							_column(60) "`value_`i''" _column(70) "`new_value_`i''" _column(80) "Failed"
+					}
 				}
 			}
 		}
@@ -341,7 +395,88 @@
 		cap log close
 		
 		* Save file
-		save "`saving'", replace		
+		save "`saving'", replace
+		
+		/***********************************************************************
+		Calculate HFC Error Rates
+		***********************************************************************/		
+		
+		* Import correction data and extract error rates per correction
+		use "`corr_data'", clear
+		
+		gen err_on_obs = regexs(0) if regexm(assign_weight, "[0-9]")
+		destring err_on_obs, replace
+		drop enum_name assign_weight rtype
+		
+		* Add error rates for each observation
+		bysort skey fprimary: egen err_rate_on_obs = sum(err_on_obs)
+		gen err = 1 if err_on_obs
+		bysort skey fprimary: egen err_count_on_obs = sum(err)
+		drop err_on_obs err
+		duplicates drop skey fprimary, force
+		save "`corr_data'", replace
+
+		
+		use "`saving'", clear
+		drop if mi(key)
+				
+		* Merge In the error sheets
+		merge 1:1 skey fprimary using "`corr_data'"
+		
+		replace err_rate_on_obs = 0 if mi(err_rate_on_obs)
+		replace err_count_on_obs = 0 if mi(err_count_on_obs)
+		
+		bysort researcher_id: egen hfc_err_rate = mean(err_rate_on_obs)
+		bysort researcher_id: egen hfc_err_count = sum(err_count_on_obs)
+		bysort researcher_id: gen survey_count = _N if !mi(key)
+		bysort researcher_id: gen keep_obs = _n if !mi(key)
+		
+		keep if keep_obs == 1
+		
+		if "`rtype'" == "r1d1" {
+			loc opt "replace"
+		}
+		
+		else {
+			loc opt "append"
+		}
+		
+		cap log close
+		log using "`errlog'", `opt' text
+		
+		* Create Header
+		noi di "{hline 82}"
+		noi di _dup(82) "-"
+		noi di _dup(82) "*"
+	
+		noi di "{bf: HIGH FREQUENCY CHECKS FOR DIRTS ANNUAL SURVEY 2017}"
+		noi di _column(10) "{bf:ERROR RATES LOG}" 
+		noi di
+		noi di "{bf: Date: `c(current_date)'}"
+	
+		noi di _dup(82) "*"
+		noi di _dup(82) "-"
+		noi di "{hline 82}"
+		noi di 
+		
+		* set trace on
+		
+		noi di "researcher_id" _column(20) "researcher_name" _column(60) "team_id" _column(70) "team_name" _column(90) "survey_count" _column(105) "hfc_err_count" _column(120) "hfc_err_rate"
+		
+		count if !mi(skey)
+		forval cr = 1/`r(N)' {
+			loc researcher_id = researcher_id[`cr']
+			loc researcher_name = researcher_name[`cr']
+			loc team_id = team_id[`cr']
+			loc team_name = team_name[`cr']
+			loc survey_count = survey_count[`cr']
+			loc hfc_err_count = hfc_err_count[`cr']
+			loc hfc_err_rate = hfc_err_rate[`cr']
+			loc hfc_err_rate: di %5.2f `hfc_err_rate'
+			
+			noi di "`researcher_id'" _column(20) "`researcher_name'" _column(60) "`team_id'" _column(70) "`team_name'" _column(90) "`survey_count'" _column(105) "`hfc_err_count'" _column(120) "`hfc_err_rate' %"
+		}
+		
 	}
 	
 	

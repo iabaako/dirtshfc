@@ -176,7 +176,7 @@
 		
 		replace `enum_name' = enum_name_keep
 		drop enum_name_keep
-		
+	
 		* Drop the enum_data from memory
 		macro drop _enum_data
 		
