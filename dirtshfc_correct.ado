@@ -130,6 +130,7 @@
 			Import the SCTO generated dataset. This dataset is what is created 
 			after dirtshfc_prep.ado is runned
 		    ******************************************************************/
+			
 			* Import correction sheet
 			import exc using "`corrfile'", sh(constraints) case(l) first clear
 			tostring rtype, replace
@@ -145,6 +146,8 @@
 				foreach var in `vars' {
 					gen `var'_ok = 0
 				}
+				
+				save "`saving'", replace
 
 			}
 			
@@ -172,7 +175,6 @@
 			noi di _dup(82) "-"
 			noi di "{hline 82}"
 		
-			use "`using'", clear
 			/*******************************************************************
 			Mark Flagged observations as okay. Some observatios may be flagged as 
 			outliers or suspicious but upon investigation may be deemed as okay.
@@ -198,7 +200,7 @@
 				}
 
 				* Load dataset and mark as okay. For each var, create a var *_ok
-				use "`using'", clear
+				use "`saving'", clear
 				forval i = 1/`hfc_okay' {
 					
 					* set trace on
