@@ -18,6 +18,7 @@
 		
 		#d;
 		syntax name using/, 
+		DATE(string)
 		INPUTSHeet(string)
 		ENUMVars(namelist min=2 max=2)
 		LOGFolder(string)			
