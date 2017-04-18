@@ -1,4 +1,4 @@
-*! version 1.0.0 Ishmail Azindoo Baako (IPA) April 9, 2016
+*! version 1.1.0 Ishmail Azindoo Baako (IPA) April 18, 2016
 
 /* 
 	This stata program is part of the HFC for the DIRTS Annual Survey 2017. 
@@ -12,6 +12,8 @@
 	dispvars	: Variables to display at hh level excluding the hhid
 	logfolder	: Name of folder were logfiles are saved
 	saving		: Name for saving data after hfc is run
+	
+	v1.0.1 -- Round vars to 2 dp and add arg date
 
 */	
 	prog def dirtshfc_enumdb
@@ -119,8 +121,7 @@
 			replace `tv' = 0 if `tv' == .y
 			replace `tv' = 1 if `tv' == .n
 			bysort `enum_id': egen _tmp = mean(`tv')
-			replace `tv' = _tmp
-			format `tv' %4.2f
+			replace `tv' = round(_tmp, 0.01)
 			drop _tmp
 		}
 	
@@ -197,9 +198,8 @@
 				replace `var' = `var' == .y
 			
 				bysort `enum_id': egen _tmp = mean(`var')
-				replace `var' = _tmp
+				replace `var' = round(_tmp, 0.01)
 				drop _tmp
-				format `var' %5.2f 
 				loc ms_track = `ms_track' + `cnt'
 			}
 			
@@ -265,8 +265,7 @@
 			
 			if `cnt' == 1 {
 				bysort `enum_id': egen _tmp = mean(`var')
-				replace `var' = _tmp
-				format `var' %5.2f
+				replace `var' = round(_tmp, 0.01)
 				drop _tmp
 				loc rate_vars "`rate_vars' `var'"
 				loc track_nm = `track_nm' + `cnt'
@@ -334,8 +333,7 @@
 			
 			if `cnt' == 1 {
 				bysort `enum_id': egen _tmp = mean(`var')
-				replace `var' = _tmp
-				format `var' %5.2f
+				replace `var' = round(_tmp, 0.01)
 				drop _tmp
 				loc rate_vars "`rate_vars' `var'"
 				loc track_nm = `track_nm' + `cnt'
