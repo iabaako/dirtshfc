@@ -262,10 +262,11 @@
 			Drop Observations. Drop observations that have been marked in the 
 			correction sheet to be dropped
 			********************************************************************/
-			
+
 			if `hfc_drop' > 0 {
 				use `corr_data', clear
-				noi di "{bf: Dropped `hfc_drop' observations from the dataset, Details are as follows:}"
+				noi di
+				noi di "{bf: Dropping `hfc_drop' observations from the dataset, Details are as follows:}"
 				noi di "skey" _column(15) "`id'" _column(30) "Results"
 				noi di "{hline 82}"
 				
@@ -309,7 +310,7 @@
 				* drop macros
 				macro drop _skey_* _`id'_* _variable_* _value_*
 			}
-			
+		
 			* save dataset
 			save "`saving'", replace
 			noi di 
