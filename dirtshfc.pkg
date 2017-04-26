@@ -7,6 +7,5 @@ f dirtshfc_enumdb.ado
 f dirtshfc_xtra.ado
 f dirtshfc_clean.ado
 f bcstats.ado
-f bcstats.sthlp
 f reliabilityratio.ado
 

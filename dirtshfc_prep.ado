@@ -24,10 +24,6 @@
 			ENUMDetails(string)			
 			SAVing(string)
 			RTYpe(string)
-			[
-			BCData(string)				
-			BCSave(string)
-			]
 		;
 		#d cr
 
@@ -302,21 +298,24 @@
 		save "`saving'", replace
 		
 		/***********************************************************************
-		Prepare backcheck data for analysis
-		
-		** WORK ON THIS AFTER SEEING THE BACK CHECK DATA**
+		Concat k_plot_name_rp* and k_used_unit_rp*
 		***********************************************************************/
+		* NB: k_used_unit_rp* is in a nested tepeat group
+		* get all the vars in k_plot_name_rp*
 		
-		* Check that the bcdata option was specified and import bcdata if it was		
-		cap use "`bcdata'", clear
-		if _rc == 601 {
-			noi di as err "dirtshfc_prep: Back check dataset (`bcdata') not found"
-			exit 601
-		}
-			
-		else {
-			* Write prep code for bcdata here
-			
+		if "`rtype'" != "r1d2" {
+			unab k_plot: k_plot_name_rp*
+			loc k_plot_cnt = wordcount("`k_plot'")
+		
+		
+			forval i = 1/`k_plot_cnt' {
+				unab k_used: k_used_unit_rp*_`i'
+				loc k_used_cnt = wordcount("`k_used'")
+				forval j = 1/`k_used_cnt' {
+					decode k_used_unit_rp_`j'_`i', gen (k_plot_name_used_combo_`j'_`i')
+					replace k_plot_name_used_combo_`j'_`i' = "PLOT NAME:" + k_plot_name_rp_`i' + " UNIT:" + k_plot_name_used_combo_`j'_`i'
+				} 
+			}
 		}
 	}
 		

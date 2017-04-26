@@ -612,6 +612,8 @@
 							
 						sort `enum_id'
 						cap noi l skey `enumvars' `id' `dispvars' `show_var' `var' `mndv' `mxdv' if `var'_sf & !`var'_ok & !mi(key) & team_id == `team', noo sepby(`enum_id') abbrev(32)
+						* drop showvar 
+						macro drop _show_var
 						loc ++j
 					}
 				}
@@ -792,7 +794,7 @@
 				
 				* Save a copy after first loop
 				save "`saving'", replace
-				cap drop *_sf *_hf *_ok
+				cap drop *_sf *_hf *_ok *_combo_*
 				
 				/***************************************************************
 				CHECK 8: NO MISS
