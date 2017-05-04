@@ -624,6 +624,10 @@
 			}
 			
 			* Save a copy after first loop
+			if `team' == 0 {
+				compress, nocoalesce
+			}
+			
 			save "`saving'", replace
 
 			if `team' == 0 {
@@ -794,7 +798,10 @@
 				
 				* Save a copy after first loop
 				save "`saving'", replace
-				cap drop *_sf *_hf *_ok *_combo_*
+				cap drop *_sf 
+				cap drop *_hf 
+				cap drop *_ok 
+				cap drop *_combo_*
 				
 				/***************************************************************
 				CHECK 8: NO MISS

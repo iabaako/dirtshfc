@@ -63,8 +63,8 @@
 		tempfile corr_data 
 		import exc using "`corrfile'", sh(corrections) case(l) first clear
 		tostring rtype, replace
+		replace rtype = lower(rtype)
 		keep if rtype == "`rtype'"
-		
 		* Trim all string vars
 		ds, has(type string)
 		foreach vtt in `r(varlist)' {
@@ -405,7 +405,7 @@
 		***********************************************************************/		
 		
 		* Import correction data and extract error rates per correction
-		use "`corr_data'", clear
+		use `corr_data', clear
 		
 		gen err_on_obs = regexs(0) if regexm(assign_weight, "[0-9]")
 		destring err_on_obs, replace
