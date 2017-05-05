@@ -118,7 +118,6 @@
 		if !_rc {
 			* First confirm that skey is unique for this dataset. It usually is
 			cap isid key
-			noi di in red "`_rc'"
 			if !_rc {
 				/* generate a shorter key. This will be easier for field teams 
 				to work with. There is a chance that that the skey may not be
@@ -128,7 +127,7 @@
 			}
 			
 			* Stop running if key is not unique
-			else {
+			else if _rc == 459 {
 				noi di as err "dirtshfc_prep: FATAL ERROR!! Variable KEY does not UNIQUELY identify the observations"
 				noi di as err "Contact Ishmail or Vinny Immediately"
 				exit 459
