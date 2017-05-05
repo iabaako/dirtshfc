@@ -118,6 +118,7 @@
 		if !_rc {
 			* First confirm that skey is unique for this dataset. It usually is
 			cap isid key
+			noi di in red "`_rc'"
 			if !_rc {
 				/* generate a shorter key. This will be easier for field teams 
 				to work with. There is a chance that that the skey may not be
