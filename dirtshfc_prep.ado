@@ -140,6 +140,13 @@
 			exit 111
 		}
 		
+		* Drop false launch communities
+		gen temp_community_id = upper(substr(fprimary, 1, 4))
+		drop if inlist(temp_community_id, "BIYO", "LAAM", "NAJA")
+		drop if inlist(temp_community_id, "TUNA", "DAMA", "YUNA")
+		drop if inlist(temp_community_id, "NUJA", "ADIB", "NASH")
+		drop if inlist(temp_community_id, "NEBO", "TUNY")
+		
 		/**********************************************************************
 		Change var types, drop unwanted vars and merge with the enum_details dataset
 		***********************************************************************/

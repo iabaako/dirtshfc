@@ -146,7 +146,8 @@
 				foreach var in `vars' {
 					gen `var'_ok = 0
 				}
-				
+								
+				* save data
 				save "`saving'", replace
 
 			}
@@ -207,14 +208,14 @@
 					* Check that the skey and ids entered are in the dataset
 					cap assert skey != "`skey_`i''"						
 					if !_rc {
-						noi di as err "dirtshfc_correct: Wrong skey(`skey_`i'') specified in correction sheet"
-						exit 9
+						noi di in red "dirtshfc_correct: Wrong skey(`skey_`i'') specified in correction sheet"
+						* exit 9
 					}
 					
 					cap assert `id' != "``id'_`i''"						
 					if !_rc {
-						noi di as err "dirtshfc_correct: Wrong `id'(``id'_`i'') specified in correction sheet"
-						exit 9
+						noi di in red "dirtshfc_correct: Wrong `id'(``id'_`i'') specified in correction sheet"
+						* exit 9
 					}
 
 					* Check if the variable marker exist, else create it
@@ -285,14 +286,14 @@
 					
 					cap assert skey != "`skey_`i''"						
 					if !_rc {
-						noi di as err "dirtshfc_correct: Wrong skey(`skey_`i'') specified in correction sheet"
-						exit 9
+						noi di in red "dirtshfc_correct: Wrong skey(`skey_`i'') specified in correction sheet"
+						* exit 9
 					}
 					
 					cap assert `id' != "``id'_`i''"						
 					if !_rc {
-						noi di as err "dirtshfc_correct: Wrong `id'(``id'_`i'') specified in correction sheet"
-						exit 9
+						noi di in red "dirtshfc_correct: Wrong `id'(``id'_`i'') specified in correction sheet"
+						* exit 9
 					}
 
 					drop if skey == "`skey_`i''" & `id' == "``id'_`i''"
@@ -344,14 +345,14 @@
 					* Check that skey and id vars specified are correct
 					cap assert skey != "`skey_`i''"						
 					if !_rc {
-						noi di as err "dirtshfc_correct: Wrong skey(`skey_`i'') specified in correction sheet"
-						exit 9
+						noi di in red "dirtshfc_correct: Wrong skey(`skey_`i'') specified in correction sheet"
+						* exit 9
 					}
 				
 					cap assert `id' != "``id'_`i''"						
 					if !_rc {
-						noi di as err "dirtshfc_correct: Wrong `id'(``id'_`i'') specified in correction sheet"
-						exit 9
+						noi di in red "dirtshfc_correct: Wrong `id'(``id'_`i'') specified in correction sheet"
+						* exit 9
 					}
 					
 					loc true 0
@@ -402,7 +403,7 @@
 		
 		/***********************************************************************
 		Calculate HFC Error Rates
-		***********************************************************************/		
+		***********************************************************************		
 		
 		* Import correction data and extract error rates per correction
 		use `corr_data', clear
@@ -479,6 +480,8 @@
 			
 			noi di "`researcher_id'" _column(20) "`researcher_name'" _column(60) "`team_id'" _column(70) "`team_name'" _column(90) "`survey_count'" _column(105) "`hfc_err_count'" _column(120) "`hfc_err_rate' %"
 		}
+		
+		*/
 		
 	}
 	
